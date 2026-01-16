@@ -299,8 +299,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                   <TableBody>
                     {complianceItems.map((item, index) => (
                       <React.Fragment key={item.itemNumber}>
-                        <TableRow 
-                          key={item.itemNumber}
+                        <TableRow
                           className={cn(
                             "cursor-pointer hover:bg-muted/50 transition-colors animate-fade-in",
                             expandedRows.includes(item.itemNumber) && "bg-muted/30"
