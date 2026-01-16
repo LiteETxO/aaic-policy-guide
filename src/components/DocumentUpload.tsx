@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ChangeEvent, type DragEvent, type ElementType } from "react";
 import { Upload, FileText, Receipt, CheckCircle2, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ interface UploadZone {
   title: string;
   titleAmharic: string;
   description: string;
-  icon: React.ElementType;
+  icon: ElementType;
   accept: string;
   file: File | null;
   fileText?: string;
@@ -67,7 +67,7 @@ Note: For best results, please paste the extracted text content from this docume
     });
   };
 
-  const handleDrop = async (e: React.DragEvent, zoneId: string) => {
+  const handleDrop = async (e: DragEvent, zoneId: string) => {
     e.preventDefault();
     setDragOver(null);
     const file = e.dataTransfer.files[0];
@@ -81,7 +81,7 @@ Note: For best results, please paste the extracted text content from this docume
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, zoneId: string) => {
+  const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>, zoneId: string) => {
     const file = e.target.files?.[0];
     if (file) {
       const fileText = await readFileAsText(file);
