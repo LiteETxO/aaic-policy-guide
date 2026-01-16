@@ -222,21 +222,78 @@ const CitationCard = ({ citation }: { citation: Citation }) => (
 const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
   const [showFormalReport, setShowFormalReport] = useState(false);
+  const [showRawResponse, setShowRawResponse] = useState(false);
+
+  const tryRepairJson = (raw: string): AnalysisData | null => {
+    try {
+      let s = raw.trim();
+
+      // Strip markdown code fences
+      s = s.replace(/^```json\s*/i, "");
+      s = s.replace(/^```\s*/i, "");
+      s = s.replace(/```\s*$/i, "");
+
+      // Try direct parse first
+      try {
+        return JSON.parse(s);
+      } catch {
+        // Try to extract the JSON object portion
+        const first = s.indexOf("{");
+        const last = s.lastIndexOf("}");
+        if (first !== -1 && last !== -1 && last > first) {
+          const candidate = s.slice(first, last + 1);
+          return JSON.parse(candidate);
+        }
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
 
   // Handle parse error or raw response
   if (data?.parseError && data?.rawResponse) {
+    const repaired = tryRepairJson(data.rawResponse);
+    if (repaired) {
+      // Re-render using the repaired JSON so the UI shows the normal report view.
+      return <AnalysisResults data={repaired} />;
+    }
+
     return (
       <section className="py-16 bg-muted/20">
         <div className="container">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-3">Analysis Results</h2>
-            <p className="text-muted-foreground">Raw AI Response (parsing failed)</p>
+            <p className="text-muted-foreground">Could not render the report (invalid/truncated JSON)</p>
           </div>
+
           <Card className="max-w-4xl mx-auto">
-            <CardContent className="py-6">
-              <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg overflow-auto max-h-[600px]">
-                {data.rawResponse}
-              </pre>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertOctagon className="h-5 w-5 text-destructive" />
+                <CardTitle className="text-lg">የትንተና ውጤት ማሳየት አልተቻለም (Render Failed)</CardTitle>
+              </div>
+              <CardDescription>
+                The backend returned an incomplete or malformed response. Please re-run the analysis.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowRawResponse((v) => !v)}
+                  className="gap-2"
+                >
+                  {showRawResponse ? "Hide raw output" : "Show raw output"}
+                </Button>
+              </div>
+
+              {showRawResponse && (
+                <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg overflow-auto max-h-[600px]">
+                  {data.rawResponse}
+                </pre>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -399,21 +399,54 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
 
     console.log("Calling AI gateway...");
 
+    const body: any = {
+      model: "google/gemini-2.5-pro",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 24000,
+      // Use tool-calling to force a valid JSON payload (much more reliable than free-form JSON text).
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "return_policy_analysis",
+            description: "Return the full analysis as a single JSON object matching the required output format.",
+            parameters: {
+              type: "object",
+              properties: {
+                documentComprehension: { type: "object" },
+                executiveSummary: { type: "object" },
+                licenseSnapshot: { type: "object" },
+                complianceItems: { type: "array", items: { type: "object" } },
+                analysisCompleteness: { type: "object" },
+                officerActionsNeeded: { type: "array", items: { type: "object" } },
+              },
+              required: [
+                "documentComprehension",
+                "executiveSummary",
+                "licenseSnapshot",
+                "complianceItems",
+                "analysisCompleteness",
+                "officerActionsNeeded",
+              ],
+              additionalProperties: true,
+            },
+          },
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "return_policy_analysis" } },
+    };
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.1,
-        max_tokens: 24000,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -437,33 +470,63 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
     const aiResponse = await response.json();
     console.log("AI response received");
 
-    const content = aiResponse.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new Error("No content in AI response");
+    const choice = aiResponse.choices?.[0];
+    const msg = choice?.message;
+    const finishReason = choice?.finish_reason;
+
+    const tryParseJson = (input: string) => {
+      const trimmed = input.trim();
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return null;
+      }
+    };
+
+    const stripCodeFences = (text: string) => {
+      let s = text.trim();
+      if (s.startsWith("```json")) s = s.slice(7);
+      else if (s.startsWith("```")) s = s.slice(3);
+      if (s.endsWith("```")) s = s.slice(0, -3);
+      return s.trim();
+    };
+
+    const extractJsonObject = (text: string) => {
+      const s = stripCodeFences(text);
+      const first = s.indexOf("{");
+      const last = s.lastIndexOf("}");
+      if (first !== -1 && last !== -1 && last > first) return s.slice(first, last + 1);
+      return null;
+    };
+
+    // Prefer tool-call arguments (forced JSON), otherwise fallback to content parsing.
+    const toolArgs: string | undefined = msg?.tool_calls?.[0]?.function?.arguments;
+    const content: string = typeof msg?.content === "string" ? msg.content : "";
+
+    let analysisResult: any = null;
+
+    if (toolArgs) {
+      analysisResult = tryParseJson(toolArgs);
     }
 
-    // Try to parse as JSON, handling markdown code blocks
-    let analysisResult;
-    try {
-      // Remove potential markdown code block markers
-      let cleanContent = content.trim();
-      if (cleanContent.startsWith("```json")) {
-        cleanContent = cleanContent.slice(7);
-      } else if (cleanContent.startsWith("```")) {
-        cleanContent = cleanContent.slice(3);
+    if (!analysisResult && content) {
+      analysisResult = tryParseJson(stripCodeFences(content));
+      if (!analysisResult) {
+        const extracted = extractJsonObject(content);
+        if (extracted) analysisResult = tryParseJson(extracted);
       }
-      if (cleanContent.endsWith("```")) {
-        cleanContent = cleanContent.slice(0, -3);
-      }
-      analysisResult = JSON.parse(cleanContent.trim());
-    } catch (parseError) {
-      console.error("Failed to parse AI response as JSON:", parseError);
-      // Return the raw content if parsing fails
+    }
+
+    if (!analysisResult) {
+      const raw = toolArgs || content || "";
+      console.error("Failed to parse AI response as JSON");
       analysisResult = {
-        rawResponse: content,
+        rawResponse: raw,
         parseError: true,
+        parseErrorReason: finishReason === "length" ? "MODEL_OUTPUT_TRUNCATED" : "INVALID_JSON",
       };
     }
+
 
     return new Response(JSON.stringify({ 
       success: true, 
