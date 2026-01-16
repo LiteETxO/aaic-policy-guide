@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { 
   CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Scale, 
   AlertCircle, BookOpen, Quote, ChevronDown, ChevronRight, ExternalLink,
-  ClipboardList, AlertOctagon
+  ClipboardList, AlertOctagon, FileCheck, FileWarning
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 
-type ComplianceStatus = "Compliant" | "Conditional" | "Needs Clarification" | "Non-Compliant";
+// Types matching the new AI output format
+type EligibilityStatus = 
+  | "Eligible – Listed Capital Good" 
+  | "Eligible – Listed Capital Good (Mapped)" 
+  | "Eligible – Essential Capital Good (Not Listed)" 
+  | "Requires Clarification" 
+  | "Not Eligible";
+
+type LicenseAlignment = "Aligned" | "Conditional" | "Needs Clarification" | "Not Aligned";
 
 interface Citation {
   documentName: string;
@@ -20,32 +28,95 @@ interface Citation {
   relevance: string;
 }
 
+interface MatchCandidate {
+  policyEntry: string;
+  similarities: string;
+  differences: string;
+  confidence: "High" | "Medium" | "Low";
+}
+
 interface ReasoningPoint {
   point: string;
-  type: "match" | "assumption-avoided" | "ambiguity";
+  type: "listed-match" | "mapped-match" | "essential-inclusion" | "exclusion" | "ambiguity" | "match" | "assumption-avoided";
+}
+
+interface EssentialityAnalysis {
+  functionalNecessity: string;
+  operationalLink: string;
+  capitalNature: string;
+  noProhibition: string;
 }
 
 interface ComplianceItem {
   itemNumber: number;
   invoiceItem: string;
   normalizedName: string;
+  category?: string;
+  specs?: string;
   invoiceRef?: string;
-  licenseAlignment: ComplianceStatus;
+  matchResult?: "Exact" | "Mapped" | "Not Matched";
+  matchCandidates?: MatchCandidate[];
+  eligibilityStatus?: EligibilityStatus;
+  eligibilityPath?: string;
+  licenseAlignment: LicenseAlignment;
   licenseEvidence: string;
-  policyCompliance: ComplianceStatus;
   citations: Citation[];
+  essentialityAnalysis?: EssentialityAnalysis;
   reasoning: ReasoningPoint[];
+  // Legacy support
+  policyCompliance?: string;
+}
+
+interface DocumentComprehension {
+  gateStatus: "PASSED" | "BLOCKED";
+  blockedReason?: string | null;
+  documents?: Array<{
+    documentName: string;
+    documentType: string;
+    languagesDetected?: string[];
+    pageCount?: number;
+    ocrConfidence?: string;
+    keySectionsDetected?: string[];
+    unreadablePages?: number[];
+    readStatus?: string;
+  }>;
+  policyIndex?: Array<{
+    documentName: string;
+    articleSection: string;
+    pageNumber: number;
+    clauseHeading: string;
+    scopeOfApplication: string;
+    keywords: string[];
+  }>;
+  licenseUnderstanding?: {
+    licensedActivity: string;
+    scopeLimitations: string;
+    conditions: string;
+    extractionStatus: string;
+  };
+  invoiceUnderstanding?: {
+    totalLineItems: number;
+    itemsWithSpecs: number;
+    ambiguousItems: number;
+    readabilityStatus: string;
+  };
+  analysisPermissionStatement?: string;
 }
 
 interface ActionItem {
-  type: "missing" | "unreadable" | "conflict" | "policy-gap";
+  type: "missing" | "unreadable" | "conflict" | "policy-gap" | "missing-evidence" | "ambiguous-mapping" | "document-ingestion-blocked";
   description: string;
   severity: "high" | "medium" | "low";
+  relatedItems?: number[];
 }
 
 interface AnalysisData {
+  documentComprehension?: DocumentComprehension;
   executiveSummary?: {
     overallStatus: string;
+    eligibleCount?: number;
+    clarificationCount?: number;
+    notEligibleCount?: number;
     topIssues: string[];
     additionalInfoNeeded: string[];
   };
@@ -54,8 +125,8 @@ interface AnalysisData {
     sector: string;
     scopeOfOperation: string;
     restrictions: string;
-    licenseNumber: string;
-    issueDate: string;
+    licenseNumber?: string;
+    issueDate?: string;
   };
   complianceItems?: ComplianceItem[];
   officerActionsNeeded?: ActionItem[];
@@ -67,19 +138,50 @@ interface AnalysisResultsProps {
   data?: AnalysisData;
 }
 
-const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string }> = {
+// Eligibility status config (new format)
+const eligibilityConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string }> = {
+  "Eligible – Listed Capital Good": { icon: CheckCircle2, color: "text-success", label: "Eligible (Listed)", bgColor: "bg-success/10" },
+  "Eligible – Listed Capital Good (Mapped)": { icon: CheckCircle2, color: "text-success", label: "Eligible (Mapped)", bgColor: "bg-success/10" },
+  "Eligible – Essential Capital Good (Not Listed)": { icon: CheckCircle2, color: "text-emerald-600", label: "Eligible (Essential)", bgColor: "bg-emerald-500/10" },
+  "Requires Clarification": { icon: HelpCircle, color: "text-blue-500", label: "Needs Clarification", bgColor: "bg-blue-500/10" },
+  "Not Eligible": { icon: XCircle, color: "text-destructive", label: "Not Eligible", bgColor: "bg-destructive/10" },
+};
+
+// License alignment config
+const licenseConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string }> = {
+  "Aligned": { icon: CheckCircle2, color: "text-success", label: "Aligned", bgColor: "bg-success/10" },
+  "Conditional": { icon: AlertTriangle, color: "text-warning", label: "Conditional", bgColor: "bg-warning/10" },
+  "Needs Clarification": { icon: HelpCircle, color: "text-blue-500", label: "Needs Clarification", bgColor: "bg-blue-500/10" },
+  "Not Aligned": { icon: XCircle, color: "text-destructive", label: "Not Aligned", bgColor: "bg-destructive/10" },
+};
+
+// Legacy status config for backward compatibility
+const legacyStatusConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string }> = {
   "Compliant": { icon: CheckCircle2, color: "text-success", label: "Compliant", bgColor: "bg-success/10" },
   "Conditional": { icon: AlertTriangle, color: "text-warning", label: "Conditional", bgColor: "bg-warning/10" },
   "Needs Clarification": { icon: HelpCircle, color: "text-blue-500", label: "Needs Clarification", bgColor: "bg-blue-500/10" },
   "Non-Compliant": { icon: XCircle, color: "text-destructive", label: "Non-Compliant", bgColor: "bg-destructive/10" },
 };
 
-const StatusBadge = ({ status }: { status: string }) => {
-  const config = statusConfig[status] || statusConfig["Needs Clarification"];
+const EligibilityBadge = ({ status }: { status?: string }) => {
+  if (!status) return <Badge variant="outline" className="text-muted-foreground">Unknown</Badge>;
+  const config = eligibilityConfig[status] || legacyStatusConfig[status] || { icon: HelpCircle, color: "text-muted-foreground", label: status, bgColor: "bg-muted" };
   const Icon = config.icon;
   return (
-    <Badge variant="outline" className={cn("gap-1.5 font-medium", config.bgColor, config.color)}>
-      <Icon className="h-3.5 w-3.5" />
+    <Badge variant="outline" className={cn("gap-1.5 font-medium text-xs", config.bgColor, config.color)}>
+      <Icon className="h-3 w-3" />
+      {config.label}
+    </Badge>
+  );
+};
+
+const LicenseBadge = ({ status }: { status?: string }) => {
+  if (!status) return <Badge variant="outline" className="text-muted-foreground">Unknown</Badge>;
+  const config = licenseConfig[status] || legacyStatusConfig[status] || { icon: HelpCircle, color: "text-muted-foreground", label: status, bgColor: "bg-muted" };
+  const Icon = config.icon;
+  return (
+    <Badge variant="outline" className={cn("gap-1.5 font-medium text-xs", config.bgColor, config.color)}>
+      <Icon className="h-3 w-3" />
       {config.label}
     </Badge>
   );
@@ -133,12 +235,19 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const complianceItems = data?.complianceItems || [];
   const executiveSummary = data?.executiveSummary;
   const licenseSnapshot = data?.licenseSnapshot;
+  const documentComprehension = data?.documentComprehension;
   const officerActionsNeeded = data?.officerActionsNeeded || [];
 
-  const compliantCount = complianceItems.filter(item => item.policyCompliance === "Compliant").length;
-  const conditionalCount = complianceItems.filter(item => item.policyCompliance === "Conditional").length;
-  const clarificationCount = complianceItems.filter(item => item.policyCompliance === "Needs Clarification").length;
-  const nonCompliantCount = complianceItems.filter(item => item.policyCompliance === "Non-Compliant").length;
+  // Calculate counts from new format (eligibilityStatus) or use executive summary counts
+  const eligibleCount = executiveSummary?.eligibleCount ?? complianceItems.filter(item => 
+    item.eligibilityStatus?.startsWith("Eligible") || item.policyCompliance === "Compliant"
+  ).length;
+  const clarificationCount = executiveSummary?.clarificationCount ?? complianceItems.filter(item => 
+    item.eligibilityStatus === "Requires Clarification" || item.policyCompliance === "Needs Clarification" || item.policyCompliance === "Conditional"
+  ).length;
+  const notEligibleCount = executiveSummary?.notEligibleCount ?? complianceItems.filter(item => 
+    item.eligibilityStatus === "Not Eligible" || item.policyCompliance === "Non-Compliant"
+  ).length;
   const totalCount = complianceItems.length;
 
   const toggleRow = (id: number) => {
@@ -170,6 +279,108 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
           <p className="text-sm text-muted-foreground mt-2">የትንተና ውጤቶች • ሊከታተሉ የሚችሉ ማጣቀሻዎች</p>
         </div>
 
+        {/* Document Comprehension Gate Status */}
+        {documentComprehension && (
+          <Card className={cn(
+            "max-w-4xl mx-auto mb-8 border-l-4 animate-fade-in",
+            documentComprehension.gateStatus === "PASSED" ? "border-l-success" : "border-l-destructive"
+          )}>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                {documentComprehension.gateStatus === "PASSED" ? (
+                  <FileCheck className="h-5 w-5 text-success" />
+                ) : (
+                  <FileWarning className="h-5 w-5 text-destructive" />
+                )}
+                <CardTitle className="text-lg">Document Comprehension Gate</CardTitle>
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "ml-2",
+                    documentComprehension.gateStatus === "PASSED" 
+                      ? "bg-success/10 text-success border-success/30" 
+                      : "bg-destructive/10 text-destructive border-destructive/30"
+                  )}
+                >
+                  {documentComprehension.gateStatus}
+                </Badge>
+              </div>
+              {documentComprehension.blockedReason && (
+                <CardDescription className="text-destructive">
+                  {documentComprehension.blockedReason}
+                </CardDescription>
+              )}
+              {documentComprehension.analysisPermissionStatement && (
+                <CardDescription className="text-success">
+                  {documentComprehension.analysisPermissionStatement}
+                </CardDescription>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Documents Acknowledgment */}
+              {documentComprehension.documents && documentComprehension.documents.length > 0 && (
+                <div>
+                  <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    Documents Read ({documentComprehension.documents.length})
+                  </h5>
+                  <div className="grid gap-2">
+                    {documentComprehension.documents.map((doc, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2 rounded bg-muted/50 text-sm">
+                        {doc.readStatus === "Complete" ? (
+                          <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                        ) : doc.readStatus === "Partial" ? (
+                          <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                        )}
+                        <span className="font-medium">{doc.documentName}</span>
+                        <Badge variant="secondary" className="text-xs">{doc.documentType}</Badge>
+                        {doc.pageCount && <span className="text-muted-foreground text-xs">{doc.pageCount} pages</span>}
+                        {doc.ocrConfidence && (
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-xs",
+                              doc.ocrConfidence === "High" && "text-success",
+                              doc.ocrConfidence === "Medium" && "text-warning",
+                              doc.ocrConfidence === "Low" && "text-destructive"
+                            )}
+                          >
+                            OCR: {doc.ocrConfidence}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* License Understanding */}
+              {documentComprehension.licenseUnderstanding && (
+                <div className="p-3 rounded bg-muted/30 border">
+                  <h6 className="text-xs font-semibold text-muted-foreground uppercase mb-2">License Understanding</h6>
+                  <p className="text-sm"><strong>Activity:</strong> {documentComprehension.licenseUnderstanding.licensedActivity}</p>
+                  {documentComprehension.licenseUnderstanding.scopeLimitations && (
+                    <p className="text-sm text-muted-foreground"><strong>Scope:</strong> {documentComprehension.licenseUnderstanding.scopeLimitations}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Invoice Understanding */}
+              {documentComprehension.invoiceUnderstanding && (
+                <div className="flex gap-4 text-sm">
+                  <span><strong>{documentComprehension.invoiceUnderstanding.totalLineItems}</strong> line items</span>
+                  <span><strong>{documentComprehension.invoiceUnderstanding.itemsWithSpecs}</strong> with specs</span>
+                  {documentComprehension.invoiceUnderstanding.ambiguousItems > 0 && (
+                    <span className="text-warning"><strong>{documentComprehension.invoiceUnderstanding.ambiguousItems}</strong> ambiguous</span>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Executive Decision Summary */}
         {executiveSummary && (
           <Card className="max-w-4xl mx-auto mb-8 border-l-4 border-l-primary shadow-medium animate-fade-in">
@@ -189,16 +400,16 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                   <p className="text-xs text-muted-foreground">Overall Status</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-success/10 border border-success/20">
-                  <p className="text-2xl font-bold text-success mb-1">{compliantCount}</p>
-                  <p className="text-xs text-muted-foreground">Compliant</p>
+                  <p className="text-2xl font-bold text-success mb-1">{eligibleCount}</p>
+                  <p className="text-xs text-muted-foreground">Eligible</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-warning/10 border border-warning/20">
-                  <p className="text-2xl font-bold text-warning mb-1">{conditionalCount + clarificationCount}</p>
+                  <p className="text-2xl font-bold text-warning mb-1">{clarificationCount}</p>
                   <p className="text-xs text-muted-foreground">Need Review</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <p className="text-2xl font-bold text-destructive mb-1">{nonCompliantCount}</p>
-                  <p className="text-xs text-muted-foreground">Non-Compliant</p>
+                  <p className="text-2xl font-bold text-destructive mb-1">{notEligibleCount}</p>
+                  <p className="text-xs text-muted-foreground">Not Eligible</p>
                 </div>
               </div>
 
@@ -292,8 +503,8 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                       <TableHead className="font-semibold">Item #</TableHead>
                       <TableHead className="font-semibold">Invoice Item</TableHead>
                       <TableHead className="font-semibold">Normalized Name</TableHead>
-                      <TableHead className="font-semibold">License</TableHead>
-                      <TableHead className="font-semibold">Policy</TableHead>
+                      <TableHead className="font-semibold">License Align.</TableHead>
+                      <TableHead className="font-semibold">Eligibility</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -317,8 +528,8 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                           <TableCell className="font-mono text-sm">{item.itemNumber}</TableCell>
                           <TableCell className="text-sm max-w-[200px] truncate">{item.invoiceItem}</TableCell>
                           <TableCell className="font-medium">{item.normalizedName}</TableCell>
-                          <TableCell><StatusBadge status={item.licenseAlignment} /></TableCell>
-                          <TableCell><StatusBadge status={item.policyCompliance} /></TableCell>
+                          <TableCell><LicenseBadge status={item.licenseAlignment} /></TableCell>
+                          <TableCell><EligibilityBadge status={item.eligibilityStatus || item.policyCompliance} /></TableCell>
                         </TableRow>
                         {expandedRows.includes(item.itemNumber) && (
                           <TableRow>
@@ -360,9 +571,10 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                                     <ul className="space-y-2">
                                       {item.reasoning.map((r, i) => (
                                         <li key={i} className="flex items-start gap-2 text-sm">
-                                          {r.type === "match" && <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />}
-                                          {r.type === "assumption-avoided" && <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />}
-                                          {r.type === "ambiguity" && <HelpCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />}
+                                          {(r.type === "match" || r.type === "listed-match" || r.type === "mapped-match") && <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />}
+                                          {(r.type === "assumption-avoided" || r.type === "exclusion") && <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />}
+                                          {(r.type === "ambiguity") && <HelpCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />}
+                                          {r.type === "essential-inclusion" && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />}
                                           <span>{r.point}</span>
                                         </li>
                                       ))}
