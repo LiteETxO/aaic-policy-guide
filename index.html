@@ -27,7 +27,7 @@
       >
         <div style="max-width:560px;width:100%;border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:20px">
           <div style="font-size:14px;color:rgba(0,0,0,.65);margin-bottom:6px">AAIC Policy Decision Support</div>
-          <div id="__boot_msg" style="font-size:16px;font-weight:600">Loading</div>
+          <div id="__boot_msg" style="font-size:16px;font-weight:600">Loading...</div>
           <div style="margin-top:10px;font-size:13px;color:rgba(0,0,0,.6)">
             If this stays blank, your browser may have cached a broken script.
           </div>
@@ -90,14 +90,14 @@
           }
         }
 
-        setBootMessage("Booting");
+        setBootMessage("Booting...");
 
         // If nothing has rendered after a few seconds, show guidance (helps diagnose "pure white" reports)
         window.setTimeout(function () {
           var root = document.getElementById("root");
-          // If the boot element is still present, the app bundle likely didnt execute.
+          // If the boot element is still present, the app bundle likely didn't execute.
           if (root && document.getElementById("__boot")) {
-            setBootMessage("Still loading If this persists, hard refresh (Ctrl/Cmd+Shift+R). ");
+            setBootMessage("Still loading... If this persists, hard refresh (Ctrl/Cmd+Shift+R). ");
           }
         }, 6000);
 
