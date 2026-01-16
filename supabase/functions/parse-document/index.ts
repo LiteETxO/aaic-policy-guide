@@ -138,7 +138,20 @@ serve(async (req) => {
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    const aiResponse = await response.json();
+    // Read response as text first to handle potential empty responses
+    const responseText = await response.text();
+    if (!responseText || responseText.trim() === '') {
+      throw new Error("Empty response from AI gateway");
+    }
+    
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse AI response:", responseText.substring(0, 500));
+      throw new Error("Invalid JSON response from AI gateway");
+    }
+    
     console.log("Document parsed successfully");
 
     const extractedText = aiResponse.choices?.[0]?.message?.content;
@@ -169,22 +182,25 @@ serve(async (req) => {
       });
 
       if (metadataResponse.ok) {
-        const metadataAiResponse = await metadataResponse.json();
-        const metadataText = metadataAiResponse.choices?.[0]?.message?.content;
-        
-        if (metadataText) {
-          try {
-            // Extract JSON from the response (handle markdown code blocks)
-            let jsonStr = metadataText;
-            const jsonMatch = metadataText.match(/```(?:json)?\s*([\s\S]*?)```/);
-            if (jsonMatch) {
-              jsonStr = jsonMatch[1].trim();
+        try {
+          const metadataResponseText = await metadataResponse.text();
+          if (metadataResponseText && metadataResponseText.trim() !== '') {
+            const metadataAiResponse = JSON.parse(metadataResponseText);
+            const metadataText = metadataAiResponse.choices?.[0]?.message?.content;
+            
+            if (metadataText) {
+              // Extract JSON from the response (handle markdown code blocks)
+              let jsonStr = metadataText;
+              const jsonMatch = metadataText.match(/```(?:json)?\s*([\s\S]*?)```/);
+              if (jsonMatch) {
+                jsonStr = jsonMatch[1].trim();
+              }
+              metadata = JSON.parse(jsonStr);
+              console.log("Metadata extracted:", metadata);
             }
-            metadata = JSON.parse(jsonStr);
-            console.log("Metadata extracted:", metadata);
-          } catch (parseErr) {
-            console.error("Failed to parse metadata JSON:", parseErr);
           }
+        } catch (parseErr) {
+          console.error("Failed to parse metadata response:", parseErr);
         }
       }
     }
