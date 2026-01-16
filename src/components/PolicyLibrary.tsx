@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { 
   BookOpen, ShieldCheck, Lock, FileText, Calendar, User, Plus, 
   Upload, Trash2, Edit2, FileCheck, AlertCircle, ExternalLink
@@ -34,6 +34,24 @@ const PolicyLibrary = () => {
     contentMarkdown: "",
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // Prevent browser navigation when a user drops a file anywhere while the dialog is open
+  useEffect(() => {
+    if (!showUploadDialog) return;
+
+    const prevent = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    window.addEventListener("dragover", prevent);
+    window.addEventListener("drop", prevent);
+
+    return () => {
+      window.removeEventListener("dragover", prevent);
+      window.removeEventListener("drop", prevent);
+    };
+  }, [showUploadDialog]);
 
   const handleUpload = async () => {
     if (!selectedFile || !uploadForm.name) return;
