@@ -51,20 +51,71 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
   const [dragOver, setDragOver] = useState<string | null>(null);
 
   const readFileAsText = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result as string);
-      reader.onerror = reject;
-      
-      if (file.type === "text/plain" || file.name.endsWith(".txt")) {
+    // For plain text files, read directly
+    if (file.type === "text/plain" || file.name.endsWith(".txt")) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = reject;
         reader.readAsText(file);
-      } else {
-        // For non-text files, return a placeholder
-        resolve(`[File: ${file.name}, Size: ${(file.size / 1024).toFixed(1)} KB, Type: ${file.type}]
+      });
+    }
 
-Note: For best results, please paste the extracted text content from this document.`);
+    // For PDFs and images, use AI-powered parsing
+    if (file.type === "application/pdf" || file.type.startsWith("image/")) {
+      try {
+        toast.info(`Parsing ${file.name}...`);
+        
+        // Convert file to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const result = e.target?.result as string;
+            // Remove the data:...;base64, prefix
+            const base64Data = result.split(",")[1];
+            resolve(base64Data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        // Call the parse-document edge function
+        const { data, error } = await supabase.functions.invoke("parse-document", {
+          body: {
+            fileBase64: base64,
+            fileName: file.name,
+            fileType: file.type,
+          },
+        });
+
+        if (error) {
+          console.error("Parse error:", error);
+          toast.error(`Failed to parse ${file.name}`);
+          return `[Parse error for ${file.name}: ${error.message}]`;
+        }
+
+        if (data?.error) {
+          toast.error(data.error);
+          return `[Parse error for ${file.name}: ${data.error}]`;
+        }
+
+        if (data?.extractedText) {
+          toast.success(`Successfully parsed ${file.name}`);
+          return data.extractedText;
+        }
+
+        return `[No text extracted from ${file.name}]`;
+      } catch (err) {
+        console.error("Parse error:", err);
+        toast.error(`Error parsing ${file.name}`);
+        return `[Parse error for ${file.name}]`;
       }
-    });
+    }
+
+    // For other file types (xlsx, doc, etc.)
+    return `[File: ${file.name}, Size: ${(file.size / 1024).toFixed(1)} KB, Type: ${file.type}]
+
+Note: This file type cannot be automatically parsed. Please convert to PDF or paste the text content manually.`;
   };
 
   const handleDrop = async (e: DragEvent, zoneId: string) => {
