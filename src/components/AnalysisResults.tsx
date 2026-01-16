@@ -10,7 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-type ComplianceStatus = "compliant" | "conditional" | "clarification" | "non-compliant";
+type ComplianceStatus = "Compliant" | "Conditional" | "Needs Clarification" | "Non-Compliant";
 
 interface Citation {
   documentName: string;
@@ -26,10 +26,10 @@ interface ReasoningPoint {
 }
 
 interface ComplianceItem {
-  id: number;
+  itemNumber: number;
   invoiceItem: string;
   normalizedName: string;
-  invoiceRef: string;
+  invoiceRef?: string;
   licenseAlignment: ComplianceStatus;
   licenseEvidence: string;
   policyCompliance: ComplianceStatus;
@@ -43,137 +43,39 @@ interface ActionItem {
   severity: "high" | "medium" | "low";
 }
 
-const sampleData: ComplianceItem[] = [
-  {
-    id: 1,
-    invoiceItem: "CNC Lathe Machine Model XR-500",
-    normalizedName: "Industrial CNC Lathe",
-    invoiceRef: "INV-2024-0042",
-    licenseAlignment: "compliant",
-    licenseEvidence: "License Section 3.1: 'Metal fabrication and precision machining operations'",
-    policyCompliance: "compliant",
-    citations: [
-      {
-        documentName: "Capital Goods Import Guidelines",
-        articleSection: "Article 7.2.1",
-        pageNumber: 18,
-        quote: "Computer-controlled machining equipment used directly in licensed manufacturing activities qualifies as eligible capital goods.",
-        relevance: "Directly defines CNC equipment as eligible capital goods for manufacturing licenses.",
-      },
-    ],
-    reasoning: [
-      { point: "CNC lathe is explicitly listed under 'computer-controlled machining equipment' in Article 7.2.1", type: "match" },
-      { point: "License activity 'precision machining' directly matches equipment purpose", type: "match" },
-      { point: "Did not assume general manufacturing would include machining — verified against license wording", type: "assumption-avoided" },
-    ],
-  },
-  {
-    id: 2,
-    invoiceItem: "Executive Office Desk Set (5 pieces)",
-    normalizedName: "Office Furniture",
-    invoiceRef: "INV-2024-0042",
-    licenseAlignment: "conditional",
-    licenseEvidence: "License scope limited to 'manufacturing operations' — administrative support unclear",
-    policyCompliance: "conditional",
-    citations: [
-      {
-        documentName: "Capital Goods Import Guidelines",
-        articleSection: "Article 12.3",
-        pageNumber: 31,
-        quote: "Office equipment and furniture may qualify only when directly supporting licensed operational activities and not exceeding 10% of total capital goods value.",
-        relevance: "Sets conditional eligibility for office furniture with percentage cap.",
-      },
-      {
-        documentName: "Investment Incentives Directive",
-        articleSection: "Article 5.4.2",
-        pageNumber: 14,
-        quote: "Administrative support items require documented justification linking to core licensed activity.",
-        relevance: "Requires officer to verify justification documentation.",
-      },
-    ],
-    reasoning: [
-      { point: "Office furniture has conditional eligibility per Article 12.3 of Capital Goods Guidelines", type: "match" },
-      { point: "Must verify total value does not exceed 10% cap", type: "ambiguity" },
-      { point: "Justification document linking to manufacturing operations not provided", type: "ambiguity" },
-    ],
-  },
-  {
-    id: 3,
-    invoiceItem: "Toyota Hilux 4WD Pickup (2024 Model)",
-    normalizedName: "Commercial Vehicle",
-    invoiceRef: "INV-2024-0043",
-    licenseAlignment: "clarification",
-    licenseEvidence: "License does not specify transportation or logistics as part of operations",
-    policyCompliance: "clarification",
-    citations: [
-      {
-        documentName: "Capital Goods Import Guidelines",
-        articleSection: "Article 9.1",
-        pageNumber: 24,
-        quote: "Vehicles qualify as capital goods only when essential for licensed activity operations, such as construction, mining, or agricultural transport.",
-        relevance: "Establishes vehicle eligibility criteria based on operational necessity.",
-      },
-    ],
-    reasoning: [
-      { point: "Vehicle eligibility depends on 'essential for licensed activity' — manufacturing license unclear on transport needs", type: "ambiguity" },
-      { point: "License does not list logistics, delivery, or field operations", type: "match" },
-      { point: "Did not assume vehicle is for personal use — awaiting investor clarification", type: "assumption-avoided" },
-    ],
-  },
-  {
-    id: 4,
-    invoiceItem: "Samsung 65-inch Smart TV",
-    normalizedName: "Consumer Electronics",
-    invoiceRef: "INV-2024-0043",
-    licenseAlignment: "non-compliant",
-    licenseEvidence: "No alignment with licensed manufacturing activity",
-    policyCompliance: "non-compliant",
-    citations: [
-      {
-        documentName: "Capital Goods Import Guidelines",
-        articleSection: "Article 4.1.3",
-        pageNumber: 9,
-        quote: "Consumer electronics intended for personal or non-operational use are explicitly excluded from capital goods eligibility.",
-        relevance: "Direct exclusion of consumer electronics from capital goods definition.",
-      },
-      {
-        documentName: "Eligible Capital Equipment List",
-        articleSection: "Annex B, Section 2",
-        pageNumber: 45,
-        quote: "Television and entertainment equipment: Not eligible unless for approved training facility.",
-        relevance: "Confirms exclusion with narrow exception not applicable here.",
-      },
-    ],
-    reasoning: [
-      { point: "Consumer electronics explicitly excluded per Article 4.1.3", type: "match" },
-      { point: "No training facility approval found in license documentation", type: "match" },
-      { point: "Did not assume TV could be used for operational displays — policy exclusion is clear", type: "assumption-avoided" },
-    ],
-  },
-];
+interface AnalysisData {
+  executiveSummary?: {
+    overallStatus: string;
+    topIssues: string[];
+    additionalInfoNeeded: string[];
+  };
+  licenseSnapshot?: {
+    licensedActivity: string;
+    sector: string;
+    scopeOfOperation: string;
+    restrictions: string;
+    licenseNumber: string;
+    issueDate: string;
+  };
+  complianceItems?: ComplianceItem[];
+  officerActionsNeeded?: ActionItem[];
+  rawResponse?: string;
+  parseError?: boolean;
+}
 
-const actionItems: ActionItem[] = [
-  {
-    type: "missing",
-    description: "Office furniture justification document not provided — required per Article 5.4.2",
-    severity: "medium",
-  },
-  {
-    type: "conflict",
-    description: "Vehicle purpose unclear — license scope does not include transportation/logistics",
-    severity: "high",
-  },
-];
+interface AnalysisResultsProps {
+  data?: AnalysisData;
+}
 
-const statusConfig: Record<ComplianceStatus, { icon: React.ElementType; color: string; label: string; bgColor: string }> = {
-  compliant: { icon: CheckCircle2, color: "text-success", label: "Compliant", bgColor: "bg-success/10" },
-  conditional: { icon: AlertTriangle, color: "text-warning", label: "Conditional", bgColor: "bg-warning/10" },
-  clarification: { icon: HelpCircle, color: "text-blue-500", label: "Needs Clarification", bgColor: "bg-blue-500/10" },
-  "non-compliant": { icon: XCircle, color: "text-destructive", label: "Non-Compliant", bgColor: "bg-destructive/10" },
+const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string }> = {
+  "Compliant": { icon: CheckCircle2, color: "text-success", label: "Compliant", bgColor: "bg-success/10" },
+  "Conditional": { icon: AlertTriangle, color: "text-warning", label: "Conditional", bgColor: "bg-warning/10" },
+  "Needs Clarification": { icon: HelpCircle, color: "text-blue-500", label: "Needs Clarification", bgColor: "bg-blue-500/10" },
+  "Non-Compliant": { icon: XCircle, color: "text-destructive", label: "Non-Compliant", bgColor: "bg-destructive/10" },
 };
 
-const StatusBadge = ({ status }: { status: ComplianceStatus }) => {
-  const config = statusConfig[status];
+const StatusBadge = ({ status }: { status: string }) => {
+  const config = statusConfig[status] || statusConfig["Needs Clarification"];
   const Icon = config.icon;
   return (
     <Badge variant="outline" className={cn("gap-1.5 font-medium", config.bgColor, config.color)}>
@@ -204,14 +106,40 @@ const CitationCard = ({ citation }: { citation: Citation }) => (
   </div>
 );
 
-const AnalysisResults = () => {
+const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
-  
-  const compliantCount = sampleData.filter(item => item.policyCompliance === "compliant").length;
-  const conditionalCount = sampleData.filter(item => item.policyCompliance === "conditional").length;
-  const clarificationCount = sampleData.filter(item => item.policyCompliance === "clarification").length;
-  const nonCompliantCount = sampleData.filter(item => item.policyCompliance === "non-compliant").length;
-  const totalCount = sampleData.length;
+
+  // Handle parse error or raw response
+  if (data?.parseError && data?.rawResponse) {
+    return (
+      <section className="py-16 bg-muted/20">
+        <div className="container">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-3">Analysis Results</h2>
+            <p className="text-muted-foreground">Raw AI Response (parsing failed)</p>
+          </div>
+          <Card className="max-w-4xl mx-auto">
+            <CardContent className="py-6">
+              <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg overflow-auto max-h-[600px]">
+                {data.rawResponse}
+              </pre>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+    );
+  }
+
+  const complianceItems = data?.complianceItems || [];
+  const executiveSummary = data?.executiveSummary;
+  const licenseSnapshot = data?.licenseSnapshot;
+  const officerActionsNeeded = data?.officerActionsNeeded || [];
+
+  const compliantCount = complianceItems.filter(item => item.policyCompliance === "Compliant").length;
+  const conditionalCount = complianceItems.filter(item => item.policyCompliance === "Conditional").length;
+  const clarificationCount = complianceItems.filter(item => item.policyCompliance === "Needs Clarification").length;
+  const nonCompliantCount = complianceItems.filter(item => item.policyCompliance === "Non-Compliant").length;
+  const totalCount = complianceItems.length;
 
   const toggleRow = (id: number) => {
     setExpandedRows(prev => 
@@ -219,15 +147,16 @@ const AnalysisResults = () => {
     );
   };
 
-  const getOverallStatus = () => {
-    if (nonCompliantCount > 0) return { status: "Mixed", color: "text-warning" };
-    if (clarificationCount > 0) return { status: "Mixed", color: "text-warning" };
-    if (conditionalCount > 0) return { status: "Likely Compliant", color: "text-success" };
-    return { status: "Likely Compliant", color: "text-success" };
+  const getOverallStatusColor = () => {
+    const status = executiveSummary?.overallStatus || "";
+    if (status.includes("Non-Compliant")) return "text-destructive";
+    if (status.includes("Mixed")) return "text-warning";
+    if (status.includes("Compliant")) return "text-success";
+    return "text-muted-foreground";
   };
 
-  const allCitations = sampleData.flatMap(item => 
-    item.citations.map(c => ({ ...c, itemName: item.normalizedName }))
+  const allCitations = complianceItems.flatMap(item => 
+    (item.citations || []).map(c => ({ ...c, itemName: item.normalizedName }))
   );
 
   return (
@@ -242,241 +171,268 @@ const AnalysisResults = () => {
         </div>
 
         {/* Executive Decision Summary */}
-        <Card className="max-w-4xl mx-auto mb-8 border-l-4 border-l-primary shadow-medium animate-fade-in">
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <Scale className="h-5 w-5 text-primary" />
-              <CardTitle>Executive Decision Summary</CardTitle>
-            </div>
-            <CardDescription>High-level assessment for officer review</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid md:grid-cols-4 gap-4">
-              <div className="text-center p-4 rounded-lg bg-background border">
-                <p className="text-2xl font-bold mb-1">
-                  <span className={getOverallStatus().color}>{getOverallStatus().status}</span>
-                </p>
-                <p className="text-xs text-muted-foreground">Overall Status</p>
+        {executiveSummary && (
+          <Card className="max-w-4xl mx-auto mb-8 border-l-4 border-l-primary shadow-medium animate-fade-in">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <Scale className="h-5 w-5 text-primary" />
+                <CardTitle>Executive Decision Summary</CardTitle>
               </div>
-              <div className="text-center p-4 rounded-lg bg-success/10 border border-success/20">
-                <p className="text-2xl font-bold text-success mb-1">{compliantCount}</p>
-                <p className="text-xs text-muted-foreground">Compliant</p>
+              <CardDescription>High-level assessment for officer review</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-4 gap-4">
+                <div className="text-center p-4 rounded-lg bg-background border">
+                  <p className={cn("text-xl font-bold mb-1", getOverallStatusColor())}>
+                    {executiveSummary.overallStatus}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Overall Status</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-success/10 border border-success/20">
+                  <p className="text-2xl font-bold text-success mb-1">{compliantCount}</p>
+                  <p className="text-xs text-muted-foreground">Compliant</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-warning/10 border border-warning/20">
+                  <p className="text-2xl font-bold text-warning mb-1">{conditionalCount + clarificationCount}</p>
+                  <p className="text-xs text-muted-foreground">Need Review</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-2xl font-bold text-destructive mb-1">{nonCompliantCount}</p>
+                  <p className="text-xs text-muted-foreground">Non-Compliant</p>
+                </div>
               </div>
-              <div className="text-center p-4 rounded-lg bg-warning/10 border border-warning/20">
-                <p className="text-2xl font-bold text-warning mb-1">{conditionalCount + clarificationCount}</p>
-                <p className="text-xs text-muted-foreground">Need Review</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-                <p className="text-2xl font-bold text-destructive mb-1">{nonCompliantCount}</p>
-                <p className="text-xs text-muted-foreground">Non-Compliant</p>
-              </div>
-            </div>
 
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-warning" />
-                Top Issues
-              </h4>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2 text-sm">
-                  <XCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                  <span>Consumer electronics (TV) explicitly excluded under Article 4.1.3</span>
-                </li>
-                <li className="flex items-start gap-2 text-sm">
-                  <HelpCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                  <span>Vehicle purpose unclear — license does not specify transport operations</span>
-                </li>
-                <li className="flex items-start gap-2 text-sm">
-                  <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
-                  <span>Office furniture requires justification document per Article 5.4.2</span>
-                </li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
+              {executiveSummary.topIssues && executiveSummary.topIssues.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-warning" />
+                    Top Issues
+                  </h4>
+                  <ul className="space-y-2">
+                    {executiveSummary.topIssues.map((issue, index) => (
+                      <li key={index} className="flex items-start gap-2 text-sm">
+                        <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                        <span>{issue}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {executiveSummary.additionalInfoNeeded && executiveSummary.additionalInfoNeeded.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <HelpCircle className="h-4 w-4 text-blue-500" />
+                    Additional Information Needed
+                  </h4>
+                  <ul className="space-y-2">
+                    {executiveSummary.additionalInfoNeeded.map((info, index) => (
+                      <li key={index} className="flex items-start gap-2 text-sm">
+                        <HelpCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                        <span>{info}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* License Snapshot */}
-        <Card className="max-w-4xl mx-auto mb-8 animate-fade-in" style={{ animationDelay: "100ms" }}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">License Snapshot</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Licensed Activity</p>
-                <p className="text-sm font-medium">Metal fabrication and precision machining operations</p>
+        {licenseSnapshot && (
+          <Card className="max-w-4xl mx-auto mb-8 animate-fade-in" style={{ animationDelay: "100ms" }}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg">License Snapshot</CardTitle>
               </div>
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sector</p>
-                <p className="text-sm font-medium">Industrial Manufacturing</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Licensed Activity</p>
+                  <p className="text-sm font-medium">{licenseSnapshot.licensedActivity || "Not specified"}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sector</p>
+                  <p className="text-sm font-medium">{licenseSnapshot.sector || "Not specified"}</p>
+                </div>
+                {licenseSnapshot.licenseNumber && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">License Number</p>
+                    <p className="text-sm font-mono">{licenseSnapshot.licenseNumber}</p>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Scope/Restrictions</p>
+                  <p className="text-sm text-muted-foreground">{licenseSnapshot.restrictions || licenseSnapshot.scopeOfOperation || "None specified"}</p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">License Number</p>
-                <p className="text-sm font-mono">AAIC-2024-MFG-00847</p>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Scope Restrictions</p>
-                <p className="text-sm text-muted-foreground">None specified — limited to manufacturing operations</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Itemized Compliance Table */}
-        <Card className="max-w-6xl mx-auto mb-8 shadow-medium animate-fade-in" style={{ animationDelay: "200ms" }}>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-primary" />
-              <CardTitle>Itemized Compliance Table</CardTitle>
-            </div>
-            <CardDescription>Click any row to view citations and detailed reasoning</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="w-10"></TableHead>
-                    <TableHead className="font-semibold">Item #</TableHead>
-                    <TableHead className="font-semibold">Invoice Item</TableHead>
-                    <TableHead className="font-semibold">Normalized Name</TableHead>
-                    <TableHead className="font-semibold">License</TableHead>
-                    <TableHead className="font-semibold">Policy</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sampleData.map((item, index) => (
-                    <>
-                      <TableRow 
-                        key={item.id}
-                        className={cn(
-                          "cursor-pointer hover:bg-muted/50 transition-colors animate-fade-in",
-                          expandedRows.includes(item.id) && "bg-muted/30"
-                        )}
-                        style={{ animationDelay: `${300 + index * 50}ms` }}
-                        onClick={() => toggleRow(item.id)}
-                      >
-                        <TableCell className="w-10">
-                          {expandedRows.includes(item.id) ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        {complianceItems.length > 0 && (
+          <Card className="max-w-6xl mx-auto mb-8 shadow-medium animate-fade-in" style={{ animationDelay: "200ms" }}>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-primary" />
+                <CardTitle>Itemized Compliance Table</CardTitle>
+              </div>
+              <CardDescription>Click any row to view citations and detailed reasoning</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-10"></TableHead>
+                      <TableHead className="font-semibold">Item #</TableHead>
+                      <TableHead className="font-semibold">Invoice Item</TableHead>
+                      <TableHead className="font-semibold">Normalized Name</TableHead>
+                      <TableHead className="font-semibold">License</TableHead>
+                      <TableHead className="font-semibold">Policy</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {complianceItems.map((item, index) => (
+                      <>
+                        <TableRow 
+                          key={item.itemNumber}
+                          className={cn(
+                            "cursor-pointer hover:bg-muted/50 transition-colors animate-fade-in",
+                            expandedRows.includes(item.itemNumber) && "bg-muted/30"
                           )}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{item.id}</TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate">{item.invoiceItem}</TableCell>
-                        <TableCell className="font-medium">{item.normalizedName}</TableCell>
-                        <TableCell><StatusBadge status={item.licenseAlignment} /></TableCell>
-                        <TableCell><StatusBadge status={item.policyCompliance} /></TableCell>
-                      </TableRow>
-                      {expandedRows.includes(item.id) && (
-                        <TableRow key={`${item.id}-details`}>
-                          <TableCell colSpan={6} className="bg-muted/20 p-0">
-                            <div className="p-6 space-y-6">
-                              {/* License Evidence */}
-                              <div>
-                                <h5 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                                  <FileText className="h-4 w-4 text-primary" />
-                                  License Evidence
-                                </h5>
-                                <p className="text-sm text-muted-foreground bg-background p-3 rounded border">
-                                  {item.licenseEvidence}
-                                </p>
-                              </div>
-
-                              {/* Citations */}
-                              <div>
-                                <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                  <BookOpen className="h-4 w-4 text-primary" />
-                                  Policy Citations ({item.citations.length})
-                                </h5>
-                                <div className="space-y-3">
-                                  {item.citations.map((citation, i) => (
-                                    <CitationCard key={i} citation={citation} />
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Reasoning */}
-                              <div>
-                                <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                  <Scale className="h-4 w-4 text-primary" />
-                                  Reasoning
-                                </h5>
-                                <ul className="space-y-2">
-                                  {item.reasoning.map((r, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-sm">
-                                      {r.type === "match" && <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />}
-                                      {r.type === "assumption-avoided" && <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />}
-                                      {r.type === "ambiguity" && <HelpCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />}
-                                      <span>{r.point}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </div>
+                          style={{ animationDelay: `${300 + index * 50}ms` }}
+                          onClick={() => toggleRow(item.itemNumber)}
+                        >
+                          <TableCell className="w-10">
+                            {expandedRows.includes(item.itemNumber) ? (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            )}
                           </TableCell>
+                          <TableCell className="font-mono text-sm">{item.itemNumber}</TableCell>
+                          <TableCell className="text-sm max-w-[200px] truncate">{item.invoiceItem}</TableCell>
+                          <TableCell className="font-medium">{item.normalizedName}</TableCell>
+                          <TableCell><StatusBadge status={item.licenseAlignment} /></TableCell>
+                          <TableCell><StatusBadge status={item.policyCompliance} /></TableCell>
                         </TableRow>
-                      )}
-                    </>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                        {expandedRows.includes(item.itemNumber) && (
+                          <TableRow key={`${item.itemNumber}-details`}>
+                            <TableCell colSpan={6} className="bg-muted/20 p-0">
+                              <div className="p-6 space-y-6">
+                                {/* License Evidence */}
+                                <div>
+                                  <h5 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-primary" />
+                                    License Evidence
+                                  </h5>
+                                  <p className="text-sm text-muted-foreground bg-background p-3 rounded border">
+                                    {item.licenseEvidence}
+                                  </p>
+                                </div>
+
+                                {/* Citations */}
+                                {item.citations && item.citations.length > 0 && (
+                                  <div>
+                                    <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                      <BookOpen className="h-4 w-4 text-primary" />
+                                      Policy Citations ({item.citations.length})
+                                    </h5>
+                                    <div className="space-y-3">
+                                      {item.citations.map((citation, i) => (
+                                        <CitationCard key={i} citation={citation} />
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Reasoning */}
+                                {item.reasoning && item.reasoning.length > 0 && (
+                                  <div>
+                                    <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                      <Scale className="h-4 w-4 text-primary" />
+                                      Reasoning
+                                    </h5>
+                                    <ul className="space-y-2">
+                                      {item.reasoning.map((r, i) => (
+                                        <li key={i} className="flex items-start gap-2 text-sm">
+                                          {r.type === "match" && <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />}
+                                          {r.type === "assumption-avoided" && <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />}
+                                          {r.type === "ambiguity" && <HelpCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />}
+                                          <span>{r.point}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Evidence & Citations Panel */}
-        <Card className="max-w-4xl mx-auto mb-8 animate-fade-in" style={{ animationDelay: "300ms" }}>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <CardTitle>Evidence & Citations Panel</CardTitle>
-            </div>
-            <CardDescription>All policy clauses referenced in this analysis</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="multiple" className="space-y-2">
-              {allCitations.map((citation, index) => (
-                <AccordionItem 
-                  key={index} 
-                  value={`citation-${index}`}
-                  className="border rounded-lg px-4 bg-background"
-                >
-                  <AccordionTrigger className="hover:no-underline py-3">
-                    <div className="flex items-center gap-3 text-left">
-                      <Badge variant="outline" className="shrink-0">{citation.articleSection}</Badge>
-                      <span className="text-sm font-medium">{citation.documentName}</span>
-                      <span className="text-xs text-muted-foreground">p.{citation.pageNumber}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-4 pt-2">
-                    <div className="space-y-3">
-                      <div className="flex gap-2">
-                        <Quote className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                        <p className="text-sm italic text-muted-foreground">"{citation.quote}"</p>
+        {allCitations.length > 0 && (
+          <Card className="max-w-4xl mx-auto mb-8 animate-fade-in" style={{ animationDelay: "300ms" }}>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <CardTitle>Evidence & Citations Panel</CardTitle>
+              </div>
+              <CardDescription>All policy clauses referenced in this analysis</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="multiple" className="space-y-2">
+                {allCitations.map((citation, index) => (
+                  <AccordionItem 
+                    key={index} 
+                    value={`citation-${index}`}
+                    className="border rounded-lg px-4 bg-background"
+                  >
+                    <AccordionTrigger className="hover:no-underline py-3">
+                      <div className="flex items-center gap-3 text-left">
+                        <Badge variant="outline" className="shrink-0">{citation.articleSection}</Badge>
+                        <span className="text-sm font-medium">{citation.documentName}</span>
+                        <span className="text-xs text-muted-foreground">p.{citation.pageNumber}</span>
                       </div>
-                      <div className="flex items-start gap-2 text-sm">
-                        <ExternalLink className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-medium">Applied to: </span>
-                          <span className="text-muted-foreground">{citation.itemName}</span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-4 pt-2">
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <Quote className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                          <p className="text-sm italic text-muted-foreground">"{citation.quote}"</p>
                         </div>
+                        <div className="flex items-start gap-2 text-sm">
+                          <ExternalLink className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-medium">Applied to: </span>
+                            <span className="text-muted-foreground">{citation.itemName}</span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-primary/80 pl-6">{citation.relevance}</p>
                       </div>
-                      <p className="text-sm text-primary/80 pl-6">{citation.relevance}</p>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </CardContent>
-        </Card>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Officer Action Needed */}
-        {actionItems.length > 0 && (
+        {officerActionsNeeded.length > 0 && (
           <Card className="max-w-4xl mx-auto mb-8 border-warning/50 animate-fade-in" style={{ animationDelay: "400ms" }}>
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2">
@@ -487,7 +443,7 @@ const AnalysisResults = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {actionItems.map((action, index) => (
+                {officerActionsNeeded.map((action, index) => (
                   <div 
                     key={index}
                     className={cn(

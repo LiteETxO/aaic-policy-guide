@@ -2,3 +2,6 @@ project_id = "jhepcrdlffyqwgqvjuwr"
 
 [functions.analyze-documents]
 verify_jwt = false
+
+[functions.seed-policy-document]
+verify_jwt = false
