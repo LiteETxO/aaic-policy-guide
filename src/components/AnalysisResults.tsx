@@ -2,17 +2,18 @@ import React, { useState } from "react";
 import { 
   CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Scale, 
   AlertCircle, BookOpen, Quote, ChevronDown, ChevronRight, ExternalLink,
-  ClipboardList, AlertOctagon, FileCheck, FileWarning
+  ClipboardList, AlertOctagon, FileCheck, FileWarning, FileOutput, LayoutList
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import { ReportGenerator } from "@/components/report/ReportGenerator";
 
 // Types matching the new AI output format
-type EligibilityStatus = 
+type EligibilityStatus =
   | "Eligible – Listed Capital Good" 
   | "Eligible – Listed Capital Good (Mapped)" 
   | "Eligible – Essential Capital Good (Not Listed)" 
@@ -211,6 +212,7 @@ const CitationCard = ({ citation }: { citation: Citation }) => (
 
 const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
+  const [showFormalReport, setShowFormalReport] = useState(false);
 
   // Handle parse error or raw response
   if (data?.parseError && data?.rawResponse) {
@@ -269,6 +271,29 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
     (item.citations || []).map(c => ({ ...c, itemName: item.normalizedName }))
   );
 
+  // Show formal report view
+  if (showFormalReport) {
+    return (
+      <section className="py-8 bg-muted/20 print:bg-white print:py-0">
+        <div className="container print:max-w-none print:px-0">
+          {/* Toggle back to interactive view - hidden in print */}
+          <div className="flex justify-end mb-4 print:hidden">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowFormalReport(false)}
+              className="gap-2"
+            >
+              <LayoutList className="h-4 w-4" />
+              <span>ወደ ተግባራዊ እይታ ተመለስ (Back to Interactive View)</span>
+            </Button>
+          </div>
+          
+          <ReportGenerator analysisData={data} />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-16 bg-muted/20">
       <div className="container">
@@ -278,6 +303,17 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             በፖሊሲ ላይ የተመሰረተ የብቁነት ግምገማ ከሊከታተሉ የሚችሉ ማጣቀሻዎች ጋር
           </p>
           <p className="text-sm text-muted-foreground mt-2">(Policy-anchored compliance assessment with traceable citations)</p>
+          
+          {/* Button to generate formal report */}
+          <div className="mt-6">
+            <Button 
+              onClick={() => setShowFormalReport(true)}
+              className="gap-2 gradient-hero text-primary-foreground"
+            >
+              <FileOutput className="h-4 w-4" />
+              <span>ሪፖርት ያውርዱ / ያትሙ (Generate Formal Report)</span>
+            </Button>
+          </div>
         </div>
 
         {/* Document Comprehension Gate Status */}
