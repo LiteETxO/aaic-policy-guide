@@ -25,9 +25,9 @@ const Index = () => {
         <HeroSection />
         <PolicyLibrary />
         <DocumentUpload onAnalyze={handleAnalyze} />
-        {showResults && (
+        {showResults && analysisData && (
           <div id="results">
-            <AnalysisResults />
+            <AnalysisResults data={analysisData} />
           </div>
         )}
       </main>
