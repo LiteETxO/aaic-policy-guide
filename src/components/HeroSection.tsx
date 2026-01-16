@@ -54,13 +54,13 @@ const HeroSection = () => {
             },
             {
               icon: Scale,
-              title: "Compliance Check",
-              desc: "Cross-reference items against Ministry of Finance guidelines",
+              title: "Policy-Anchored",
+              desc: "All decisions grounded in admin-controlled Policy Library documents",
             },
             {
               icon: Shield,
-              title: "Decision Support",
-              desc: "Clear recommendations with full transparency and reasoning",
+              title: "Traceable Citations",
+              desc: "Every statement cites document, article, page, and quote",
             },
           ].map((feature, i) => (
             <div
