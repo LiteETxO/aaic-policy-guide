@@ -101,12 +101,27 @@
           }
         }, 6000);
 
+        function refetchAndRecover(badUrl, msg) {
+          try {
+            // Try to bypass HTTP cache and refetch the chunk, then reload.
+            fetch(badUrl, { cache: "reload" })
+              .catch(function () {
+                // If refetch fails, still attempt recovery reload.
+              })
+              .finally(function () {
+                attemptRecover();
+              });
+          } catch (e) {
+            attemptRecover();
+          }
+        }
+
         window.addEventListener("error", function (e) {
           var msg = String(e && e.message ? e.message : "");
           var filename = String(e && e.filename ? e.filename : "");
           if (msg.indexOf("Unexpected end of script") !== -1 && filename.indexOf("/node_modules/.vite/deps/") !== -1) {
             if (sessionStorage.getItem(KEY) === "1") showFallback(msg + "\n" + filename);
-            else attemptRecover();
+            else refetchAndRecover(filename, msg);
           }
         });
 
