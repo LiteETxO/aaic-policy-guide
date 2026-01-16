@@ -21,6 +21,70 @@
 
   <body>
     <div id="root"></div>
+
+    <!-- Fallback recovery if a cached Vite prebundle chunk is truncated (blank screen) -->
+    <script>
+      (function () {
+        var KEY = "__lovable_chunk_recover_attempt__";
+
+        function attemptRecover() {
+          try {
+            if (sessionStorage.getItem(KEY) === "1") return;
+            sessionStorage.setItem(KEY, "1");
+            var url = new URL(window.location.href);
+            url.searchParams.set("_r", String(Date.now()));
+            window.location.replace(url.toString());
+          } catch (e) {
+            // If sessionStorage is unavailable, still try a cache-busted reload
+            var url2 = new URL(window.location.href);
+            url2.searchParams.set("_r", String(Date.now()));
+            window.location.replace(url2.toString());
+          }
+        }
+
+        function showFallback() {
+          var el = document.getElementById("root");
+          if (!el) return;
+          el.innerHTML =
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif">' +
+            '<div style="max-width:520px;width:100%;border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:20px">' +
+            '<h1 style="margin:0 0 8px;font-size:18px">Loading error</h1>' +
+            '<p style="margin:0 0 12px;color:rgba(0,0,0,.65);font-size:14px;line-height:1.4">Your browser loaded a truncated cached script. Please hard refresh (Ctrl/Cmd+Shift+R) or open in an incognito window.</p>' +
+            '<button id="_recover" style="background:#0f766e;color:white;border:0;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer">Reload</button>' +
+            '</div></div>';
+          var btn = document.getElementById("_recover");
+          if (btn) {
+            btn.addEventListener("click", function () {
+              try {
+                sessionStorage.removeItem(KEY);
+              } catch (e) {}
+              var url = new URL(window.location.href);
+              url.searchParams.set("_r", String(Date.now()));
+              window.location.replace(url.toString());
+            });
+          }
+        }
+
+        window.addEventListener("error", function (e) {
+          var msg = String(e && e.message ? e.message : "");
+          var filename = String(e && e.filename ? e.filename : "");
+          if (msg.indexOf("Unexpected end of script") !== -1 && filename.indexOf("/node_modules/.vite/deps/") !== -1) {
+            if (sessionStorage.getItem(KEY) === "1") showFallback();
+            else attemptRecover();
+          }
+        });
+
+        window.addEventListener("unhandledrejection", function (e) {
+          var reason = e && e.reason;
+          var msg = typeof reason === "string" ? reason : String(reason && reason.message ? reason.message : "");
+          if (msg.indexOf("Failed to fetch dynamically imported module") !== -1 || msg.indexOf("Importing a module script failed") !== -1) {
+            if (sessionStorage.getItem(KEY) === "1") showFallback();
+            else attemptRecover();
+          }
+        });
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
