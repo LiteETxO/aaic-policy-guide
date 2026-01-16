@@ -112,6 +112,14 @@ interface ActionItem {
   relatedItems?: number[];
 }
 
+interface AnalysisCompleteness {
+  totalInvoiceItems: number;
+  analyzedItems: number;
+  isComplete: boolean;
+  skippedItems?: string[];
+  completenessNote?: string;
+}
+
 interface AnalysisData {
   documentComprehension?: DocumentComprehension;
   executiveSummary?: {
@@ -131,6 +139,7 @@ interface AnalysisData {
     issueDate?: string;
   };
   complianceItems?: ComplianceItem[];
+  analysisCompleteness?: AnalysisCompleteness;
   officerActionsNeeded?: ActionItem[];
   rawResponse?: string;
   parseError?: boolean;
@@ -239,7 +248,16 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const executiveSummary = data?.executiveSummary;
   const licenseSnapshot = data?.licenseSnapshot;
   const documentComprehension = data?.documentComprehension;
+  const analysisCompleteness = data?.analysisCompleteness;
   const officerActionsNeeded = data?.officerActionsNeeded || [];
+
+  // Calculate completeness metrics
+  const totalInvoiceItems = analysisCompleteness?.totalInvoiceItems || 
+    documentComprehension?.invoiceUnderstanding?.totalLineItems || 0;
+  const analyzedItems = analysisCompleteness?.analyzedItems || complianceItems.length;
+  const isAnalysisComplete = analysisCompleteness?.isComplete ?? 
+    (totalInvoiceItems > 0 ? analyzedItems >= totalInvoiceItems : true);
+  const skippedItems = analysisCompleteness?.skippedItems || [];
 
   // Calculate counts from new format (eligibilityStatus) or use executive summary counts
   const eligibleCount = executiveSummary?.eligibleCount ?? complianceItems.filter(item => 
@@ -412,6 +430,56 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                   {documentComprehension.invoiceUnderstanding.ambiguousItems > 0 && (
                     <span className="text-warning"><strong>{documentComprehension.invoiceUnderstanding.ambiguousItems}</strong> ግልጽ ያልሆኑ (ambiguous)</span>
                   )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Analysis Completeness Warning */}
+        {totalInvoiceItems > 0 && !isAnalysisComplete && (
+          <Card className="max-w-4xl mx-auto mb-8 border-l-4 border-l-warning bg-warning/5 animate-fade-in">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <AlertOctagon className="h-5 w-5 text-warning" />
+                <CardTitle className="text-lg text-warning">
+                  ያልተተነተኑ ዕቃዎች ተገኝተዋል (Incomplete Analysis Detected)
+                </CardTitle>
+                <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
+                  {analyzedItems}/{totalInvoiceItems} ዕቃዎች (items)
+                </Badge>
+              </div>
+              <CardDescription>
+                ከጠቅላላ {totalInvoiceItems} የደረሰኝ ዕቃዎች ውስጥ {analyzedItems} ብቻ ተተንትነዋል። 
+                (Only {analyzedItems} out of {totalInvoiceItems} invoice items were analyzed.)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
+                <p className="text-sm font-medium text-warning mb-2">
+                  ⚠️ ማስጠንቀቂያ (Warning):
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  አንዳንድ ዕቃዎች ሊታለፉ ወይም ሊቧደኑ ይችላሉ። ለተሟላ ትንተና ድጋሚ ይሞክሩ።
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  (Some items may have been skipped or grouped. Consider re-running for complete analysis.)
+                </p>
+              </div>
+              
+              {skippedItems.length > 0 && (
+                <div>
+                  <h5 className="text-sm font-semibold mb-2 text-warning">
+                    ያልተተነተኑ ዕቃዎች (Skipped Items):
+                  </h5>
+                  <ul className="space-y-1">
+                    {skippedItems.map((item, i) => (
+                      <li key={i} className="text-sm flex items-center gap-2">
+                        <XCircle className="h-3 w-3 text-warning" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </CardContent>

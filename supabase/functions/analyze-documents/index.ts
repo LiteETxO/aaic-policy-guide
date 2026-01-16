@@ -170,6 +170,40 @@ An AAIC officer should see:
 4️⃣ Zero "black box" jumps
 
 ═══════════════════════════════════════════════════════════════════════════════
+9️⃣ CRITICAL: COMPLETE ITEM ANALYSIS REQUIREMENT (MANDATORY)
+═══════════════════════════════════════════════════════════════════════════════
+
+You MUST analyze EVERY SINGLE line item from the invoice(s). NO ITEM MAY BE SKIPPED OR OMITTED.
+
+STRICT RULES:
+- If the invoice contains 25 line items, you MUST produce exactly 25 entries in complianceItems
+- If an item is ambiguous or unclear, STILL include it with "Requires Clarification" status
+- If an item cannot be matched to any policy entry, STILL include it with appropriate reasoning
+- If an item description is partially readable, STILL include it and note the readability issue
+- The count of complianceItems MUST EQUAL invoiceUnderstanding.totalLineItems
+
+FOR EACH ITEM YOU MUST PROVIDE:
+- itemNumber (sequential, matching invoice order)
+- invoiceItem (exact text from invoice, even if unclear)
+- normalizedName (your best interpretation)
+- eligibilityStatus (one of the defined statuses)
+- licenseAlignment (assessment)
+- citations (at least one policy reference)
+- reasoning (at least one reasoning point)
+
+VALIDATION CHECK:
+Before outputting, verify that:
+complianceItems.length === invoiceUnderstanding.totalLineItems
+
+If they don't match, you MUST add the missing items before responding.
+
+NEVER:
+- Skip items because they seem similar to others
+- Group multiple items into one entry
+- Omit items because analysis is uncertain
+- Stop early due to length constraints
+
+═══════════════════════════════════════════════════════════════════════════════
 OUTPUT FORMAT (JSON - REQUIRED)
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -273,6 +307,13 @@ OUTPUT FORMAT (JSON - REQUIRED)
       ]
     }
   ],
+  "analysisCompleteness": {
+    "totalInvoiceItems": 0,
+    "analyzedItems": 0,
+    "isComplete": true,
+    "skippedItems": [],
+    "completenessNote": "All X items from invoice have been analyzed"
+  },
   "officerActionsNeeded": [
     {
       "type": "missing-evidence | unreadable | conflict | policy-gap | ambiguous-mapping | document-ingestion-blocked",
@@ -320,6 +361,11 @@ ${doc.content_markdown || doc.content_text || "No content available"}
       policyContext = "NO POLICY DOCUMENTS PROVIDED - Cannot perform compliance analysis without policy library.";
     }
 
+    // Pre-count invoice items to enforce completeness
+    const invoiceItemPattern = /(?:Item\s*(?:No\.?|#)?\s*(\d+))|(?:^(\d+)[\.\)]\s+[A-Za-z])|(?:^\d+\s+[A-Z][a-z])/gm;
+    const invoiceMatches = (invoiceText || "").match(invoiceItemPattern);
+    const estimatedItemCount = invoiceMatches?.length || 0;
+
     const userPrompt = `
 POLICY LIBRARY (Source of Truth):
 ${policyContext}
@@ -330,9 +376,25 @@ ${licenseText || "No license document provided"}
 COMMERCIAL INVOICE(S):
 ${invoiceText || "No invoice document provided"}
 
-Please analyze the invoice items against the investment license and policy documents. 
+═══════════════════════════════════════════════════════════════════════════════
+⚠️ CRITICAL COMPLETENESS REQUIREMENT ⚠️
+═══════════════════════════════════════════════════════════════════════════════
+${estimatedItemCount > 0 ? `DETECTED APPROXIMATELY ${estimatedItemCount} LINE ITEMS IN THE INVOICE.` : "Count all line items in the invoice carefully."}
+
+You MUST:
+1. Count the EXACT number of line items in the invoice
+2. Set invoiceUnderstanding.totalLineItems to this exact count
+3. Produce EXACTLY that many entries in complianceItems array
+4. Verify complianceItems.length === totalLineItems before responding
+5. Set analysisCompleteness.isComplete = true ONLY if all items are analyzed
+
+DO NOT skip, group, or omit any items. Each invoice line = one complianceItems entry.
+═══════════════════════════════════════════════════════════════════════════════
+
+Please analyze ALL invoice items against the investment license and policy documents. 
 First complete the mandatory Document Comprehension Phase, then proceed to policy-based compliance analysis only if the gate is passed.
 Provide your analysis in the specified JSON format with traceable citations for every compliance determination.
+REMEMBER: Every single invoice item must appear in your complianceItems array.
 `;
 
     console.log("Calling AI gateway...");
@@ -350,7 +412,7 @@ Provide your analysis in the specified JSON format with traceable citations for 
           { role: "user", content: userPrompt },
         ],
         temperature: 0.1,
-        max_tokens: 12000,
+        max_tokens: 24000,
       }),
     });
 
