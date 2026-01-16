@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
+import PolicyLibrary from "@/components/PolicyLibrary";
 import DocumentUpload from "@/components/DocumentUpload";
 import AnalysisResults from "@/components/AnalysisResults";
 import Footer from "@/components/Footer";
@@ -21,6 +22,7 @@ const Index = () => {
       <Header />
       <main className="flex-1">
         <HeroSection />
+        <PolicyLibrary />
         <DocumentUpload onAnalyze={handleAnalyze} />
         {showResults && (
           <div id="results">
