@@ -56,7 +56,7 @@ const PolicyLibrary = () => {
     };
   }, [showUploadDialog]);
 
-  // Parse PDF and extract text when a file is selected
+  // Parse PDF, extract metadata, and auto-import
   const handleFileSelect = async (file: File) => {
     if (!file || file.type !== "application/pdf") {
       toast.error("Please select a PDF file");
@@ -76,31 +76,109 @@ const PolicyLibrary = () => {
       }
       const base64 = btoa(binary);
 
-      // Call parse-document edge function
+      // Call parse-document edge function with metadata extraction
       const { data, error } = await supabase.functions.invoke("parse-document", {
         body: {
           fileBase64: base64,
           fileName: file.name,
           fileType: file.type,
+          extractMetadata: true,
         },
       });
 
       if (error) throw error;
 
       if (data?.extractedText) {
-        setUploadForm((prev) => ({
-          ...prev,
+        const metadata = data.metadata || {};
+        
+        // Auto-fill form with extracted metadata
+        setUploadForm({
+          name: metadata.name || file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "),
+          nameAmharic: metadata.nameAmharic || "",
+          directiveNumber: metadata.directiveNumber || "",
+          version: "1.0",
+          effectiveDate: metadata.effectiveDate || "",
+          documentType: metadata.documentType || "primary",
           contentMarkdown: data.extractedText,
-          // Try to extract document name from filename if not set
-          name: prev.name || file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "),
-        }));
-        toast.success("Document parsed successfully");
+        });
+
+        // Show success with summary if available
+        if (metadata.summary) {
+          toast.success(`Document parsed: ${metadata.summary.substring(0, 100)}...`);
+        } else {
+          toast.success("Document parsed and ready to import");
+        }
+        
+        // Auto-open the dialog if not already open
+        if (!showUploadDialog) {
+          setShowUploadDialog(true);
+        }
       } else if (data?.error) {
         throw new Error(data.error);
       }
     } catch (err) {
       console.error("Parse error:", err);
-      toast.error("Failed to parse document. You can still upload and add content manually.");
+      toast.error("Failed to parse document. Please try again.");
+      setSelectedFile(null);
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  // Quick import - parse and immediately upload with extracted metadata
+  const handleQuickImport = async (file: File) => {
+    if (!file || file.type !== "application/pdf") {
+      toast.error("Please select a PDF file");
+      return;
+    }
+
+    setIsParsing(true);
+    toast.info("Parsing and importing document...");
+
+    try {
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < uint8Array.byteLength; i++) {
+        binary += String.fromCharCode(uint8Array[i]);
+      }
+      const base64 = btoa(binary);
+
+      // Call parse-document edge function with metadata extraction
+      const { data, error } = await supabase.functions.invoke("parse-document", {
+        body: {
+          fileBase64: base64,
+          fileName: file.name,
+          fileType: file.type,
+          extractMetadata: true,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.extractedText) {
+        const metadata = data.metadata || {};
+        
+        // Directly upload the document
+        await uploadMutation.mutateAsync({
+          file,
+          name: metadata.name || file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "),
+          nameAmharic: metadata.nameAmharic || "",
+          directiveNumber: metadata.directiveNumber || "",
+          version: "1.0",
+          effectiveDate: metadata.effectiveDate || "",
+          documentType: metadata.documentType || "primary",
+          contentMarkdown: data.extractedText,
+        });
+
+        toast.success(`Policy document imported: ${metadata.name || file.name}`);
+      } else if (data?.error) {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      console.error("Quick import error:", err);
+      toast.error("Failed to import document. Please try manual upload.");
     } finally {
       setIsParsing(false);
     }
@@ -167,13 +245,48 @@ const PolicyLibrary = () => {
                   Sign In
                 </Button>
               ) : isAdmin ? (
-                <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                  <DialogTrigger asChild>
-                    <Button variant="hero" className="gap-2">
-                      <Plus className="h-4 w-4" />
-                      Add Policy Document
-                    </Button>
-                  </DialogTrigger>
+                <div className="flex items-center gap-2">
+                  {/* Quick Import Button */}
+                  <div className="relative">
+                    <input
+                      id="header-quick-import"
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      disabled={isParsing}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleQuickImport(file);
+                        e.target.value = "";
+                      }}
+                    />
+                    <label htmlFor="header-quick-import">
+                      <Button 
+                        variant="outline" 
+                        className="gap-2 cursor-pointer" 
+                        disabled={isParsing}
+                        asChild
+                      >
+                        <span>
+                          {isParsing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="h-4 w-4" />
+                          )}
+                          {isParsing ? "Importing..." : "Quick Import"}
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
+                  
+                  {/* Manual Upload Dialog */}
+                  <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="hero" className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Add Manually
+                      </Button>
+                    </DialogTrigger>
                   <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Upload Policy Document</DialogTitle>
@@ -344,6 +457,7 @@ const PolicyLibrary = () => {
                     </div>
                   </DialogContent>
                 </Dialog>
+                </div>
               ) : (
                 <Badge variant="secondary">Officer Access</Badge>
               )}
@@ -460,18 +574,59 @@ const PolicyLibrary = () => {
             ))}
           </div>
         ) : (
-          <Card className="border-dashed">
+          <Card 
+            className={`border-dashed transition-colors ${isAdmin ? "hover:border-primary/50" : ""}`}
+            onDragOver={isAdmin ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
+            onDrop={isAdmin ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const files = e.dataTransfer?.files;
+              if (files && files.length > 0 && files[0].type === "application/pdf") {
+                handleQuickImport(files[0]);
+              }
+            } : undefined}
+          >
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="font-semibold mb-1">No Policy Documents</h3>
-              <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
-                The Policy Library is empty. {isAdmin ? "Upload your first policy document to enable AI-powered compliance analysis." : "Contact an administrator to add policy documents."}
-              </p>
-              {isAdmin && (
-                <Button onClick={() => setShowUploadDialog(true)} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add First Document
-                </Button>
+              {isParsing ? (
+                <>
+                  <Loader2 className="h-12 w-12 text-primary mb-4 animate-spin" />
+                  <h3 className="font-semibold mb-1">Importing Policy Document...</h3>
+                  <p className="text-sm text-muted-foreground text-center max-w-md">
+                    Parsing document content and extracting metadata with AI. This may take a moment.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <h3 className="font-semibold mb-1">No Policy Documents</h3>
+                  <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
+                    {isAdmin 
+                      ? "Drop a PDF here or click below to import your first policy document. Content will be automatically extracted."
+                      : "Contact an administrator to add policy documents."}
+                  </p>
+                  {isAdmin && (
+                    <>
+                      <input
+                        id="quick-import-file"
+                        type="file"
+                        accept=".pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleQuickImport(file);
+                        }}
+                      />
+                      <label htmlFor="quick-import-file">
+                        <Button asChild className="gap-2 cursor-pointer">
+                          <span>
+                            <Upload className="h-4 w-4" />
+                            Import Policy Document
+                          </span>
+                        </Button>
+                      </label>
+                    </>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
