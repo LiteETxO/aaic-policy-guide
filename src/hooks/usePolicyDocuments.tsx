@@ -67,8 +67,17 @@ export const useUploadPolicyDocument = () => {
       parentDocumentId?: string;
       contentMarkdown?: string;
     }) => {
-      // Upload file to storage
-      const fileName = `${Date.now()}-${file.name}`;
+      // Upload file to storage - sanitize filename to ASCII only
+      const fileExtension = file.name.split('.').pop() || 'pdf';
+      const sanitizedName = file.name
+        .replace(/\.[^/.]+$/, '') // Remove extension
+        .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
+        .replace(/[^a-zA-Z0-9_-]/g, '_') // Replace special chars with underscore
+        .replace(/_+/g, '_') // Collapse multiple underscores
+        .replace(/^_|_$/g, '') // Trim underscores from ends
+        || 'document'; // Fallback if nothing remains
+      
+      const fileName = `${Date.now()}-${sanitizedName}.${fileExtension}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("policy-documents")
         .upload(fileName, file);
