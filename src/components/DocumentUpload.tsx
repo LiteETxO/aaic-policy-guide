@@ -1,8 +1,12 @@
 import { useState } from "react";
-import { Upload, FileText, Receipt, BookOpen, CheckCircle2, X } from "lucide-react";
+import { Upload, FileText, Receipt, CheckCircle2, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { usePolicyDocuments } from "@/hooks/usePolicyDocuments";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface UploadZone {
   id: string;
@@ -12,13 +16,17 @@ interface UploadZone {
   icon: React.ElementType;
   accept: string;
   file: File | null;
+  fileText?: string;
 }
 
 interface DocumentUploadProps {
-  onAnalyze: () => void;
+  onAnalyze: (analysisResult: any) => void;
 }
 
 const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
+  const { user } = useAuth();
+  const { data: policyDocuments } = usePolicyDocuments();
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadZones, setUploadZones] = useState<UploadZone[]>([
     {
       id: "license",
@@ -26,7 +34,7 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
       titleAmharic: "የኢንቨስትመንት ፈቃድ",
       description: "Upload the official investment license document",
       icon: FileText,
-      accept: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
+      accept: ".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt",
       file: null,
     },
     {
@@ -35,41 +43,51 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
       titleAmharic: "የንግድ ደረሰኞች",
       description: "Upload invoices for capital goods",
       icon: Receipt,
-      accept: ".pdf,.xls,.xlsx,.jpg,.jpeg,.png",
-      file: null,
-    },
-    {
-      id: "policy",
-      title: "Policy Guidelines",
-      titleAmharic: "የፖሊሲ መመሪያዎች",
-      description: "Ministry of Finance policy documents (optional)",
-      icon: BookOpen,
-      accept: ".pdf,.doc,.docx",
+      accept: ".pdf,.xls,.xlsx,.jpg,.jpeg,.png,.txt",
       file: null,
     },
   ]);
 
   const [dragOver, setDragOver] = useState<string | null>(null);
 
-  const handleDrop = (e: React.DragEvent, zoneId: string) => {
+  const readFileAsText = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = reject;
+      
+      if (file.type === "text/plain" || file.name.endsWith(".txt")) {
+        reader.readAsText(file);
+      } else {
+        // For non-text files, return a placeholder
+        resolve(`[File: ${file.name}, Size: ${(file.size / 1024).toFixed(1)} KB, Type: ${file.type}]
+
+Note: For best results, please paste the extracted text content from this document.`);
+      }
+    });
+  };
+
+  const handleDrop = async (e: React.DragEvent, zoneId: string) => {
     e.preventDefault();
     setDragOver(null);
     const file = e.dataTransfer.files[0];
     if (file) {
+      const fileText = await readFileAsText(file);
       setUploadZones(zones =>
         zones.map(zone =>
-          zone.id === zoneId ? { ...zone, file } : zone
+          zone.id === zoneId ? { ...zone, file, fileText } : zone
         )
       );
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, zoneId: string) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, zoneId: string) => {
     const file = e.target.files?.[0];
     if (file) {
+      const fileText = await readFileAsText(file);
       setUploadZones(zones =>
         zones.map(zone =>
-          zone.id === zoneId ? { ...zone, file } : zone
+          zone.id === zoneId ? { ...zone, file, fileText } : zone
         )
       );
     }
@@ -78,26 +96,85 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
   const removeFile = (zoneId: string) => {
     setUploadZones(zones =>
       zones.map(zone =>
-        zone.id === zoneId ? { ...zone, file: null } : zone
+        zone.id === zoneId ? { ...zone, file: null, fileText: undefined } : zone
       )
     );
   };
 
   const hasRequiredFiles = uploadZones[0].file && uploadZones[1].file;
 
+  const handleAnalyze = async () => {
+    if (!hasRequiredFiles) return;
+
+    setIsAnalyzing(true);
+
+    try {
+      const licenseZone = uploadZones.find(z => z.id === "license");
+      const invoiceZone = uploadZones.find(z => z.id === "invoice");
+
+      // Prepare policy documents for the AI
+      const policyDocsForAI = policyDocuments?.map(doc => ({
+        name: doc.name,
+        directive_number: doc.directive_number,
+        effective_date: doc.effective_date,
+        version: doc.version,
+        content_markdown: doc.content_markdown,
+        content_text: doc.content_text,
+      })) || [];
+
+      if (policyDocsForAI.length === 0) {
+        toast.error("No policy documents in library. Please add policy documents first.");
+        setIsAnalyzing(false);
+        return;
+      }
+
+      // Call the edge function
+      const { data, error } = await supabase.functions.invoke("analyze-documents", {
+        body: {
+          licenseText: licenseZone?.fileText || `License file: ${licenseZone?.file?.name}`,
+          invoiceText: invoiceZone?.fileText || `Invoice file: ${invoiceZone?.file?.name}`,
+          policyDocuments: policyDocsForAI,
+        },
+      });
+
+      if (error) {
+        console.error("Analysis error:", error);
+        toast.error(error.message || "Failed to analyze documents");
+        return;
+      }
+
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      if (data?.success && data?.analysis) {
+        toast.success("Analysis complete!");
+        onAnalyze(data.analysis);
+      } else {
+        toast.error("Unexpected response from analysis");
+      }
+    } catch (error) {
+      console.error("Analysis error:", error);
+      toast.error("An error occurred during analysis");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
     <section className="py-16 bg-muted/30">
       <div className="container">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">Upload Documents</h2>
+          <h2 className="text-3xl font-bold mb-3">Upload Case Documents</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Upload your investment license and commercial invoices for AI-powered compliance analysis.
-            Policy guidelines are optional but recommended for accuracy.
+            Upload the investment license and commercial invoices for AI-powered compliance analysis 
+            against the Policy Library.
           </p>
-          <p className="text-sm text-muted-foreground mt-2">ሰነዶችዎን ይጫኑ</p>
+          <p className="text-sm text-muted-foreground mt-2">የጉዳይ ሰነዶችን ይጫኑ</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-10">
+        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-10">
           {uploadZones.map((zone, index) => (
             <Card
               key={zone.id}
@@ -113,11 +190,9 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                     <zone.icon className="h-5 w-5 text-primary" />
                   </div>
-                  {zone.id !== "policy" && (
-                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-destructive/10 text-destructive">
-                      Required
-                    </span>
-                  )}
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-destructive/10 text-destructive">
+                    Required
+                  </span>
                 </div>
                 <CardTitle className="text-lg">{zone.title}</CardTitle>
                 <p className="text-xs text-muted-foreground">{zone.titleAmharic}</p>
@@ -176,15 +251,32 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
           <Button
             variant="hero"
             size="xl"
-            disabled={!hasRequiredFiles}
-            onClick={onAnalyze}
+            disabled={!hasRequiredFiles || isAnalyzing || !user}
+            onClick={handleAnalyze}
             className="min-w-[200px]"
           >
-            Analyze Documents
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              "Analyze Documents"
+            )}
           </Button>
           {!hasRequiredFiles && (
             <p className="text-sm text-muted-foreground mt-3">
               Please upload both the investment license and invoice(s) to proceed
+            </p>
+          )}
+          {!user && (
+            <p className="text-sm text-warning mt-3">
+              Please sign in to analyze documents
+            </p>
+          )}
+          {policyDocuments?.length === 0 && (
+            <p className="text-sm text-warning mt-3">
+              No policy documents in library — analysis requires at least one policy document
             </p>
           )}
         </div>
