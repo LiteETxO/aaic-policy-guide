@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -12,8 +13,10 @@ interface AuthModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type AuthMode = "login" | "signup" | "forgot";
+
 export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -25,7 +28,17 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/`,
+        });
+        if (error) {
+          toast.error(error.message);
+        } else {
+          toast.success("Password reset email sent! Check your inbox.");
+          setMode("login");
+        }
+      } else if (mode === "login") {
         const { error } = await signIn(email, password);
         if (error) {
           toast.error(error.message);
@@ -49,20 +62,28 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
     }
   };
 
+  const getTitle = () => {
+    if (mode === "forgot") return "Reset Password";
+    if (mode === "signup") return "Create Account";
+    return "Sign In";
+  };
+
+  const getDescription = () => {
+    if (mode === "forgot") return "Enter your email and we'll send you a reset link";
+    if (mode === "signup") return "Create an account to get started. First user becomes admin.";
+    return "Sign in to access the AAIC Policy Decision Support System";
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isLogin ? "Sign In" : "Create Account"}</DialogTitle>
-          <DialogDescription>
-            {isLogin
-              ? "Sign in to access the AAIC Policy Decision Support System"
-              : "Create an account to get started. First user becomes admin."}
-          </DialogDescription>
+          <DialogTitle>{getTitle()}</DialogTitle>
+          <DialogDescription>{getDescription()}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
+          {mode === "signup" && (
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
               <Input
@@ -87,18 +108,30 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
+          {mode !== "forgot" && (
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+          )}
+
+          {mode === "login" && (
+            <button
+              type="button"
+              onClick={() => setMode("forgot")}
+              className="text-sm text-primary hover:underline"
+            >
+              Forgot password?
+            </button>
+          )}
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? (
@@ -106,7 +139,9 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Please wait...
               </>
-            ) : isLogin ? (
+            ) : mode === "forgot" ? (
+              "Send Reset Link"
+            ) : mode === "login" ? (
               "Sign In"
             ) : (
               "Create Account"
@@ -115,12 +150,23 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
         </form>
 
         <div className="text-center text-sm">
-          {isLogin ? (
+          {mode === "forgot" ? (
+            <p>
+              Remember your password?{" "}
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="text-primary underline hover:no-underline"
+              >
+                Sign in
+              </button>
+            </p>
+          ) : mode === "login" ? (
             <p>
               Don't have an account?{" "}
               <button
                 type="button"
-                onClick={() => setIsLogin(false)}
+                onClick={() => setMode("signup")}
                 className="text-primary underline hover:no-underline"
               >
                 Create one
@@ -131,7 +177,7 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
               Already have an account?{" "}
               <button
                 type="button"
-                onClick={() => setIsLogin(true)}
+                onClick={() => setMode("login")}
                 className="text-primary underline hover:no-underline"
               >
                 Sign in
