@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type DragEvent, type ElementType } from "react";
+import { useState, useEffect, type ChangeEvent, type DragEvent, type ElementType } from "react";
 import { Upload, FileText, Receipt, CheckCircle2, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { usePolicyDocuments } from "@/hooks/usePolicyDocuments";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useWorkflowStatus } from "@/hooks/useWorkflowStatus";
 
 interface UploadZone {
   id: string;
@@ -50,12 +51,41 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
 
   const [dragOver, setDragOver] = useState<string | null>(null);
 
-  const readFileAsText = async (file: File): Promise<string> => {
+  const {
+    status,
+    startCaseImport,
+    updateCaseImportStage,
+    completeCaseImport,
+    blockCaseImport,
+    startAnalysis,
+    updateAnalysisStage,
+    completeAnalysis,
+    blockAnalysis,
+    errorAnalysis,
+    addDocumentStatus,
+    updateDocumentStatus,
+    setCaseFilesReady,
+  } = useWorkflowStatus();
+
+  // Update case files ready status when both files are uploaded
+  useEffect(() => {
+    const hasLicense = uploadZones.find(z => z.id === "license")?.file;
+    const hasInvoice = uploadZones.find(z => z.id === "invoice")?.file;
+    setCaseFilesReady(!!(hasLicense && hasInvoice));
+  }, [uploadZones, setCaseFilesReady]);
+
+  const readFileAsText = async (file: File, zoneId: string): Promise<string> => {
     // For plain text files, read directly
     if (file.type === "text/plain" || file.name.endsWith(".txt")) {
+      updateCaseImportStage("OCR_AND_TEXT_EXTRACTION");
+      updateDocumentStatus(file.name, { status: "processing", progress: 35 });
+      
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onload = (e) => {
+          updateDocumentStatus(file.name, { status: "complete", progress: 100 });
+          resolve(e.target?.result as string);
+        };
         reader.onerror = reject;
         reader.readAsText(file);
       });
@@ -64,6 +94,8 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
     // For PDFs and images, use AI-powered parsing
     if (file.type === "application/pdf" || file.type.startsWith("image/")) {
       try {
+        updateCaseImportStage("OCR_AND_TEXT_EXTRACTION");
+        updateDocumentStatus(file.name, { status: "processing", progress: 25 });
         toast.info(`Parsing ${file.name}...`);
         
         // Convert file to base64
@@ -79,6 +111,8 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
           reader.readAsDataURL(file);
         });
 
+        updateDocumentStatus(file.name, { progress: 50 });
+
         // Call the parse-document edge function
         const { data, error } = await supabase.functions.invoke("parse-document", {
           body: {
@@ -90,16 +124,19 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
 
         if (error) {
           console.error("Parse error:", error);
+          updateDocumentStatus(file.name, { status: "error", error: error.message });
           toast.error(`Failed to parse ${file.name}`);
           return `[Parse error for ${file.name}: ${error.message}]`;
         }
 
         if (data?.error) {
+          updateDocumentStatus(file.name, { status: "error", error: data.error });
           toast.error(data.error);
           return `[Parse error for ${file.name}: ${data.error}]`;
         }
 
         if (data?.extractedText) {
+          updateDocumentStatus(file.name, { status: "complete", progress: 100 });
           toast.success(`Successfully parsed ${file.name}`);
           return data.extractedText;
         }
@@ -107,6 +144,7 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
         return `[No text extracted from ${file.name}]`;
       } catch (err) {
         console.error("Parse error:", err);
+        updateDocumentStatus(file.name, { status: "error", error: "Parse failed" });
         toast.error(`Error parsing ${file.name}`);
         return `[Parse error for ${file.name}]`;
       }
@@ -123,24 +161,74 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
     setDragOver(null);
     const file = e.dataTransfer.files[0];
     if (file) {
-      const fileText = await readFileAsText(file);
+      startCaseImport();
+      addDocumentStatus({
+        name: file.name,
+        type: zoneId === "license" ? "license" : "invoice",
+        status: "pending",
+        progress: 10,
+      });
+      updateCaseImportStage("RECEIVED_FILES");
+      
+      const fileText = await readFileAsText(file, zoneId);
+      
+      updateCaseImportStage("FIELD_EXTRACTION");
+      
       setUploadZones(zones =>
         zones.map(zone =>
           zone.id === zoneId ? { ...zone, file, fileText } : zone
         )
       );
+
+      updateCaseImportStage("READABILITY_AND_COMPLETENESS_CHECK");
+      
+      // Check if both files are now uploaded
+      const updatedZones = uploadZones.map(zone =>
+        zone.id === zoneId ? { ...zone, file, fileText } : zone
+      );
+      const hasLicense = updatedZones.find(z => z.id === "license")?.file;
+      const hasInvoice = updatedZones.find(z => z.id === "invoice")?.file;
+      
+      if (hasLicense && hasInvoice) {
+        completeCaseImport();
+      }
     }
   };
 
   const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>, zoneId: string) => {
     const file = e.target.files?.[0];
     if (file) {
-      const fileText = await readFileAsText(file);
+      startCaseImport();
+      addDocumentStatus({
+        name: file.name,
+        type: zoneId === "license" ? "license" : "invoice",
+        status: "pending",
+        progress: 10,
+      });
+      updateCaseImportStage("RECEIVED_FILES");
+      
+      const fileText = await readFileAsText(file, zoneId);
+      
+      updateCaseImportStage("FIELD_EXTRACTION");
+      
       setUploadZones(zones =>
         zones.map(zone =>
           zone.id === zoneId ? { ...zone, file, fileText } : zone
         )
       );
+
+      updateCaseImportStage("READABILITY_AND_COMPLETENESS_CHECK");
+      
+      // Check if both files are now uploaded
+      const updatedZones = uploadZones.map(zone =>
+        zone.id === zoneId ? { ...zone, file, fileText } : zone
+      );
+      const hasLicense = updatedZones.find(z => z.id === "license")?.file;
+      const hasInvoice = updatedZones.find(z => z.id === "invoice")?.file;
+      
+      if (hasLicense && hasInvoice) {
+        completeCaseImport();
+      }
     }
   };
 
@@ -157,11 +245,24 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
   const handleAnalyze = async () => {
     if (!hasRequiredFiles) return;
 
+    // Check prerequisites
+    if (!status.policyLibraryReady) {
+      blockAnalysis(
+        "Policy/Case ingestion incomplete",
+        "Complete Policy Import phase first — add policy documents to the library"
+      );
+      toast.error("Policy Library is empty. Please add policy documents first.");
+      return;
+    }
+
     setIsAnalyzing(true);
+    startAnalysis();
 
     try {
       const licenseZone = uploadZones.find(z => z.id === "license");
       const invoiceZone = uploadZones.find(z => z.id === "invoice");
+
+      updateAnalysisStage("ITEM_NORMALIZATION");
 
       // Prepare policy documents for the AI
       const policyDocsForAI = policyDocuments?.map(doc => ({
@@ -174,10 +275,16 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
       })) || [];
 
       if (policyDocsForAI.length === 0) {
+        blockAnalysis(
+          "Policy Library empty",
+          "Admin must upload policy documents before analysis can proceed"
+        );
         toast.error("No policy documents in library. Please add policy documents first.");
         setIsAnalyzing(false);
         return;
       }
+
+      updateAnalysisStage("LIST_MATCHING");
 
       // Call the edge function
       const { data, error } = await supabase.functions.invoke("analyze-documents", {
@@ -190,23 +297,48 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
 
       if (error) {
         console.error("Analysis error:", error);
+        errorAnalysis(error.message || "Failed to analyze documents");
         toast.error(error.message || "Failed to analyze documents");
         return;
       }
 
       if (data?.error) {
+        errorAnalysis(data.error);
         toast.error(data.error);
         return;
       }
 
+      updateAnalysisStage("LICENSE_ALIGNMENT_CHECK");
+
+      // Small delay to show progress
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      updateAnalysisStage("ESSENTIALITY_EVALUATION");
+      
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       if (data?.success && data?.analysis) {
+        updateAnalysisStage("DECISION_TABLE_AND_CITATIONS_OUTPUT");
+        
+        // Check if analysis was blocked due to document comprehension issues
+        if (data.analysis.documentComprehension?.gateStatus === "BLOCKED") {
+          blockAnalysis(
+            data.analysis.documentComprehension.blockedReason || "Document ingestion incomplete",
+            "Review blocked documents and provide missing information"
+          );
+        } else {
+          completeAnalysis();
+        }
+        
         toast.success("Analysis complete!");
         onAnalyze(data.analysis);
       } else {
+        errorAnalysis("Unexpected response from analysis");
         toast.error("Unexpected response from analysis");
       }
     } catch (error) {
       console.error("Analysis error:", error);
+      errorAnalysis("An error occurred during analysis");
       toast.error("An error occurred during analysis");
     } finally {
       setIsAnalyzing(false);

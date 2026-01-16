@@ -17,12 +17,23 @@ import { AuthModal } from "@/components/auth/AuthModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useWorkflowStatus } from "@/hooks/useWorkflowStatus";
 
 const PolicyLibrary = () => {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const { data: policyDocuments, isLoading, error } = usePolicyDocuments();
   const uploadMutation = useUploadPolicyDocument();
   const deleteMutation = useDeletePolicyDocument();
+  
+  const {
+    startPolicyImport,
+    updatePolicyImportStage,
+    completePolicyImport,
+    blockPolicyImport,
+    addDocumentStatus,
+    updateDocumentStatus,
+    setPolicyLibraryReady,
+  } = useWorkflowStatus();
   
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -37,6 +48,15 @@ const PolicyLibrary = () => {
     contentMarkdown: "",
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  // Update policy library ready status when documents change
+  useEffect(() => {
+    if (policyDocuments && policyDocuments.length > 0) {
+      setPolicyLibraryReady(true);
+    } else {
+      setPolicyLibraryReady(false);
+    }
+  }, [policyDocuments, setPolicyLibraryReady]);
 
   // Prevent browser navigation when a user drops a file anywhere while the dialog is open
   useEffect(() => {
@@ -65,8 +85,20 @@ const PolicyLibrary = () => {
 
     setSelectedFile(file);
     setIsParsing(true);
+    
+    // Start policy import workflow
+    startPolicyImport();
+    addDocumentStatus({
+      name: file.name,
+      type: "policy",
+      status: "pending",
+      progress: 10,
+    });
 
     try {
+      updatePolicyImportStage("OCR_AND_TEXT_EXTRACTION");
+      updateDocumentStatus(file.name, { status: "processing", progress: 25 });
+      
       // Convert file to base64
       const arrayBuffer = await file.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
@@ -75,6 +107,8 @@ const PolicyLibrary = () => {
         binary += String.fromCharCode(uint8Array[i]);
       }
       const base64 = btoa(binary);
+
+      updateDocumentStatus(file.name, { progress: 35 });
 
       // Call parse-document edge function with metadata extraction
       const { data, error } = await supabase.functions.invoke("parse-document", {
@@ -88,8 +122,14 @@ const PolicyLibrary = () => {
 
       if (error) throw error;
 
+      updatePolicyImportStage("STRUCTURE_DETECTION");
+      updateDocumentStatus(file.name, { progress: 50 });
+
       if (data?.extractedText) {
         const metadata = data.metadata || {};
+        
+        updatePolicyImportStage("POLICY_INDEX_BUILD");
+        updateDocumentStatus(file.name, { progress: 70 });
         
         // Auto-fill form with extracted metadata
         setUploadForm({
@@ -102,12 +142,17 @@ const PolicyLibrary = () => {
           contentMarkdown: data.extractedText,
         });
 
+        updatePolicyImportStage("CITATION_MAPPING");
+        updateDocumentStatus(file.name, { progress: 85 });
+
         // Show success with summary if available
         if (metadata.summary) {
           toast.success(`Document parsed: ${metadata.summary.substring(0, 100)}...`);
         } else {
           toast.success("Document parsed and ready to import");
         }
+        
+        updateDocumentStatus(file.name, { status: "complete", progress: 100 });
         
         // Auto-open the dialog if not already open
         if (!showUploadDialog) {
@@ -118,6 +163,8 @@ const PolicyLibrary = () => {
       }
     } catch (err) {
       console.error("Parse error:", err);
+      updateDocumentStatus(file.name, { status: "error", error: "Parse failed" });
+      blockPolicyImport("Document parsing failed", "Please try a different PDF file or contact support");
       toast.error("Failed to parse document. Please try again.");
       setSelectedFile(null);
     } finally {
@@ -134,8 +181,20 @@ const PolicyLibrary = () => {
 
     setIsParsing(true);
     toast.info("Parsing and importing document...");
+    
+    // Start policy import workflow
+    startPolicyImport();
+    addDocumentStatus({
+      name: file.name,
+      type: "policy",
+      status: "pending",
+      progress: 10,
+    });
 
     try {
+      updatePolicyImportStage("OCR_AND_TEXT_EXTRACTION");
+      updateDocumentStatus(file.name, { status: "processing", progress: 20 });
+      
       // Convert file to base64
       const arrayBuffer = await file.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
@@ -144,6 +203,8 @@ const PolicyLibrary = () => {
         binary += String.fromCharCode(uint8Array[i]);
       }
       const base64 = btoa(binary);
+
+      updateDocumentStatus(file.name, { progress: 30 });
 
       // Call parse-document edge function with metadata extraction
       const { data, error } = await supabase.functions.invoke("parse-document", {
@@ -157,8 +218,17 @@ const PolicyLibrary = () => {
 
       if (error) throw error;
 
+      updatePolicyImportStage("STRUCTURE_DETECTION");
+      updateDocumentStatus(file.name, { progress: 50 });
+
       if (data?.extractedText) {
         const metadata = data.metadata || {};
+        
+        updatePolicyImportStage("POLICY_INDEX_BUILD");
+        updateDocumentStatus(file.name, { progress: 65 });
+        
+        updatePolicyImportStage("CITATION_MAPPING");
+        updateDocumentStatus(file.name, { progress: 80 });
         
         // Directly upload the document
         await uploadMutation.mutateAsync({
@@ -172,12 +242,16 @@ const PolicyLibrary = () => {
           contentMarkdown: data.extractedText,
         });
 
+        updateDocumentStatus(file.name, { status: "complete", progress: 100 });
+        completePolicyImport();
         toast.success(`Policy document imported: ${metadata.name || file.name}`);
       } else if (data?.error) {
         throw new Error(data.error);
       }
     } catch (err) {
       console.error("Quick import error:", err);
+      updateDocumentStatus(file.name, { status: "error", error: "Import failed" });
+      blockPolicyImport("Document import failed", "Please try manual upload or contact support");
       toast.error("Failed to import document. Please try manual upload.");
     } finally {
       setIsParsing(false);
