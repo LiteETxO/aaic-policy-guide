@@ -20,12 +20,36 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div
+        id="__boot"
+        style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif"
+      >
+        <div style="max-width:560px;width:100%;border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:20px">
+          <div style="font-size:14px;color:rgba(0,0,0,.65);margin-bottom:6px">AAIC Policy Decision Support</div>
+          <div id="__boot_msg" style="font-size:16px;font-weight:600">Loading</div>
+          <div style="margin-top:10px;font-size:13px;color:rgba(0,0,0,.6)">
+            If this stays blank, your browser may have cached a broken script.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <noscript>
+      <div style="padding:16px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif">
+        This app requires JavaScript enabled.
+      </div>
+    </noscript>
 
     <!-- Fallback recovery if a cached Vite prebundle chunk is truncated (blank screen) -->
     <script>
       (function () {
         var KEY = "__lovable_chunk_recover_attempt__";
+        var bootMsgEl = document.getElementById("__boot_msg");
+
+        function setBootMessage(msg) {
+          if (bootMsgEl) bootMsgEl.textContent = msg;
+        }
 
         function attemptRecover() {
           try {
@@ -35,23 +59,24 @@
             url.searchParams.set("_r", String(Date.now()));
             window.location.replace(url.toString());
           } catch (e) {
-            // If sessionStorage is unavailable, still try a cache-busted reload
             var url2 = new URL(window.location.href);
             url2.searchParams.set("_r", String(Date.now()));
             window.location.replace(url2.toString());
           }
         }
 
-        function showFallback() {
+        function showFallback(details) {
           var el = document.getElementById("root");
           if (!el) return;
           el.innerHTML =
             '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif">' +
-            '<div style="max-width:520px;width:100%;border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:20px">' +
+            '<div style="max-width:640px;width:100%;border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:20px">' +
             '<h1 style="margin:0 0 8px;font-size:18px">Loading error</h1>' +
             '<p style="margin:0 0 12px;color:rgba(0,0,0,.65);font-size:14px;line-height:1.4">Your browser loaded a truncated cached script. Please hard refresh (Ctrl/Cmd+Shift+R) or open in an incognito window.</p>' +
+            (details ? '<pre style="margin:0 0 12px;white-space:pre-wrap;font-size:12px;color:rgba(0,0,0,.65);background:rgba(0,0,0,.04);padding:12px;border-radius:8px">' + details + '</pre>' : '') +
             '<button id="_recover" style="background:#0f766e;color:white;border:0;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer">Reload</button>' +
             '</div></div>';
+
           var btn = document.getElementById("_recover");
           if (btn) {
             btn.addEventListener("click", function () {
@@ -65,11 +90,22 @@
           }
         }
 
+        setBootMessage("Booting");
+
+        // If nothing has rendered after a few seconds, show guidance (helps diagnose "pure white" reports)
+        window.setTimeout(function () {
+          var root = document.getElementById("root");
+          // If the boot element is still present, the app bundle likely didnt execute.
+          if (root && document.getElementById("__boot")) {
+            setBootMessage("Still loading If this persists, hard refresh (Ctrl/Cmd+Shift+R). ");
+          }
+        }, 6000);
+
         window.addEventListener("error", function (e) {
           var msg = String(e && e.message ? e.message : "");
           var filename = String(e && e.filename ? e.filename : "");
           if (msg.indexOf("Unexpected end of script") !== -1 && filename.indexOf("/node_modules/.vite/deps/") !== -1) {
-            if (sessionStorage.getItem(KEY) === "1") showFallback();
+            if (sessionStorage.getItem(KEY) === "1") showFallback(msg + "\n" + filename);
             else attemptRecover();
           }
         });
@@ -78,7 +114,7 @@
           var reason = e && e.reason;
           var msg = typeof reason === "string" ? reason : String(reason && reason.message ? reason.message : "");
           if (msg.indexOf("Failed to fetch dynamically imported module") !== -1 || msg.indexOf("Importing a module script failed") !== -1) {
-            if (sessionStorage.getItem(KEY) === "1") showFallback();
+            if (sessionStorage.getItem(KEY) === "1") showFallback(msg);
             else attemptRecover();
           }
         });

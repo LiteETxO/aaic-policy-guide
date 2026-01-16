@@ -41,6 +41,10 @@ installChunkRecovery();
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("Root element not found");
 
+// If the HTML boot screen is visible, update it as we progress.
+const bootMsgEl = document.getElementById("__boot_msg");
+if (bootMsgEl) bootMsgEl.textContent = "Loading app";
+
 const root = createRoot(rootEl);
 
 // IMPORTANT: dynamically import App so recovery logic can run even if a prebundled chunk is truncated
