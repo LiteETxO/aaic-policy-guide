@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { 
   BookOpen, ShieldCheck, Lock, FileText, Calendar, User, Plus, 
-  Upload, Trash2, Edit2, FileCheck, AlertCircle, ExternalLink
+  Upload, Trash2, Edit2, FileCheck, AlertCircle, ExternalLink, Loader2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,8 @@ import { usePolicyDocuments, useUploadPolicyDocument, useDeletePolicyDocument, P
 import { useAuth } from "@/hooks/useAuth";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const PolicyLibrary = () => {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -24,6 +26,7 @@ const PolicyLibrary = () => {
   
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [uploadForm, setUploadForm] = useState({
     name: "",
     nameAmharic: "",
@@ -52,6 +55,56 @@ const PolicyLibrary = () => {
       window.removeEventListener("drop", prevent);
     };
   }, [showUploadDialog]);
+
+  // Parse PDF and extract text when a file is selected
+  const handleFileSelect = async (file: File) => {
+    if (!file || file.type !== "application/pdf") {
+      toast.error("Please select a PDF file");
+      return;
+    }
+
+    setSelectedFile(file);
+    setIsParsing(true);
+
+    try {
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < uint8Array.byteLength; i++) {
+        binary += String.fromCharCode(uint8Array[i]);
+      }
+      const base64 = btoa(binary);
+
+      // Call parse-document edge function
+      const { data, error } = await supabase.functions.invoke("parse-document", {
+        body: {
+          fileBase64: base64,
+          fileName: file.name,
+          fileType: file.type,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.extractedText) {
+        setUploadForm((prev) => ({
+          ...prev,
+          contentMarkdown: data.extractedText,
+          // Try to extract document name from filename if not set
+          name: prev.name || file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "),
+        }));
+        toast.success("Document parsed successfully");
+      } else if (data?.error) {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      console.error("Parse error:", err);
+      toast.error("Failed to parse document. You can still upload and add content manually.");
+    } finally {
+      setIsParsing(false);
+    }
+  };
 
   const handleUpload = async () => {
     if (!selectedFile || !uploadForm.name) return;
@@ -202,7 +255,9 @@ const PolicyLibrary = () => {
                       <div className="space-y-2">
                         <Label htmlFor="file">PDF Document *</Label>
                         <div 
-                          className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors"
+                          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                            isParsing ? "border-primary/50 bg-primary/5" : "hover:border-primary/50"
+                          }`}
                           onDragOver={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -216,10 +271,7 @@ const PolicyLibrary = () => {
                             e.stopPropagation();
                             const files = e.dataTransfer?.files;
                             if (files && files.length > 0) {
-                              const file = files[0];
-                              if (file.type === "application/pdf") {
-                                setSelectedFile(file);
-                              }
+                              handleFileSelect(files[0]);
                             }
                           }}
                         >
@@ -228,10 +280,20 @@ const PolicyLibrary = () => {
                             type="file"
                             accept=".pdf"
                             className="hidden"
-                            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                            disabled={isParsing}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileSelect(file);
+                            }}
                           />
-                          <label htmlFor="file" className="cursor-pointer">
-                            {selectedFile ? (
+                          <label htmlFor="file" className={isParsing ? "cursor-wait" : "cursor-pointer"}>
+                            {isParsing ? (
+                              <div className="flex flex-col items-center gap-2 text-primary">
+                                <Loader2 className="h-8 w-8 animate-spin" />
+                                <span className="font-medium">Parsing document...</span>
+                                <span className="text-xs text-muted-foreground">Extracting text content with AI</span>
+                              </div>
+                            ) : selectedFile ? (
                               <div className="flex items-center justify-center gap-2 text-success">
                                 <FileCheck className="h-8 w-8" />
                                 <span className="font-medium">{selectedFile.name}</span>
@@ -240,6 +302,7 @@ const PolicyLibrary = () => {
                               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                 <Upload className="h-8 w-8" />
                                 <span>Click or drag PDF document here</span>
+                                <span className="text-xs">Content will be automatically extracted</span>
                               </div>
                             )}
                           </label>
@@ -247,16 +310,23 @@ const PolicyLibrary = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="contentMarkdown">Document Content (Markdown/Text)</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="contentMarkdown">Document Content (Auto-extracted)</Label>
+                          {uploadForm.contentMarkdown && (
+                            <Badge variant="outline" className="text-xs">
+                              {uploadForm.contentMarkdown.length.toLocaleString()} characters
+                            </Badge>
+                          )}
+                        </div>
                         <Textarea
                           id="contentMarkdown"
-                          placeholder="Paste the full text content of the document here for AI analysis..."
-                          className="min-h-[200px]"
+                          placeholder="Upload a PDF and the text content will be extracted automatically..."
+                          className="min-h-[200px] font-mono text-sm"
                           value={uploadForm.contentMarkdown}
                           onChange={(e) => setUploadForm({ ...uploadForm, contentMarkdown: e.target.value })}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Paste the extracted text from the PDF here. This enables AI-powered analysis and citation.
+                          Text is automatically extracted from the PDF. You can review and edit if needed.
                         </p>
                       </div>
                     </div>
