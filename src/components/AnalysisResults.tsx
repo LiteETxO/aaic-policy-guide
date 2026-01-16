@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { 
   CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Scale, 
   AlertCircle, BookOpen, Quote, ChevronDown, ChevronRight, ExternalLink,
@@ -8,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 
 type ComplianceStatus = "Compliant" | "Conditional" | "Needs Clarification" | "Non-Compliant";
 
@@ -298,7 +298,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                   </TableHeader>
                   <TableBody>
                     {complianceItems.map((item, index) => (
-                      <>
+                      <React.Fragment key={item.itemNumber}>
                         <TableRow 
                           key={item.itemNumber}
                           className={cn(
@@ -374,7 +374,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </React.Fragment>
                     ))}
                   </TableBody>
                 </Table>
