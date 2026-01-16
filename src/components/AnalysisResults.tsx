@@ -321,7 +321,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                           <TableCell><StatusBadge status={item.policyCompliance} /></TableCell>
                         </TableRow>
                         {expandedRows.includes(item.itemNumber) && (
-                          <TableRow key={`${item.itemNumber}-details`}>
+                          <TableRow>
                             <TableCell colSpan={6} className="bg-muted/20 p-0">
                               <div className="p-6 space-y-6">
                                 {/* License Evidence */}
