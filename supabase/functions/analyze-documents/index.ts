@@ -440,14 +440,35 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       tool_choice: { type: "function", function: { name: "return_policy_analysis" } },
     };
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    // Create abort controller for timeout (90 seconds max)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+    let response: Response;
+    try {
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === "AbortError") {
+        console.error("AI gateway request timed out after 90 seconds");
+        return new Response(JSON.stringify({ 
+          error: "Analysis timed out. Try with fewer invoice items or simpler documents." 
+        }), {
+          status: 504,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw fetchError;
+    }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -467,7 +488,18 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    const aiResponse = await response.json();
+    let aiResponse: any;
+    try {
+      aiResponse = await response.json();
+    } catch (jsonError) {
+      console.error("Failed to parse AI gateway response as JSON:", jsonError);
+      return new Response(JSON.stringify({ 
+        error: "Invalid response from AI service. Please try again." 
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     console.log("AI response received");
 
     const choice = aiResponse.choices?.[0];
