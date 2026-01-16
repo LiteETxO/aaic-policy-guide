@@ -183,7 +183,28 @@ const PolicyLibrary = () => {
 
                       <div className="space-y-2">
                         <Label htmlFor="file">PDF Document *</Label>
-                        <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                        <div 
+                          className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors"
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onDragEnter={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const files = e.dataTransfer?.files;
+                            if (files && files.length > 0) {
+                              const file = files[0];
+                              if (file.type === "application/pdf") {
+                                setSelectedFile(file);
+                              }
+                            }
+                          }}
+                        >
                           <input
                             id="file"
                             type="file"
@@ -200,7 +221,7 @@ const PolicyLibrary = () => {
                             ) : (
                               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                 <Upload className="h-8 w-8" />
-                                <span>Click to upload PDF document</span>
+                                <span>Click or drag PDF document here</span>
                               </div>
                             )}
                           </label>
