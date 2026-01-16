@@ -8,10 +8,11 @@ import Footer from "@/components/Footer";
 
 const Index = () => {
   const [showResults, setShowResults] = useState(false);
+  const [analysisData, setAnalysisData] = useState<any>(null);
 
-  const handleAnalyze = () => {
+  const handleAnalyze = (result: any) => {
+    setAnalysisData(result);
     setShowResults(true);
-    // Scroll to results
     setTimeout(() => {
       document.getElementById("results")?.scrollIntoView({ behavior: "smooth" });
     }, 100);
