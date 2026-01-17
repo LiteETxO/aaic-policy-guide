@@ -75,10 +75,18 @@ interface DocumentComprehension {
   documents?: Array<{
     documentName: string;
     documentType: string;
+    issuingAuthority?: string;
     languagesDetected?: string[];
     pageCount?: number;
     ocrConfidence?: string;
     keySectionsDetected?: string[];
+    capitalGoodsListPresent?: boolean;
+    annexesDetected?: string[];
+    articlesIndexed?: Array<{
+      articleNumber: string;
+      page: number;
+      clauseSummary: string;
+    }>;
     unreadablePages?: number[];
     readStatus?: string;
   }>;
@@ -484,15 +492,18 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Documents Acknowledgment */}
-              {documentComprehension.documents && documentComprehension.documents.length > 0 && (
-                <div>
-                  <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    የተነበቡ ሰነዶች (Documents Read) ({documentComprehension.documents.length})
-                  </h5>
+              <div>
+                <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  የተነበቡ ሰነዶች (Documents Read) 
+                  {documentComprehension.documents && documentComprehension.documents.length > 0 && (
+                    <span>({documentComprehension.documents.length})</span>
+                  )}
+                </h5>
+                {documentComprehension.documents && documentComprehension.documents.length > 0 ? (
                   <div className="grid gap-2">
                     {documentComprehension.documents.map((doc, i) => (
-                      <div key={i} className="flex items-center gap-3 p-2 rounded bg-muted/50 text-sm">
+                      <div key={i} className="flex flex-wrap items-center gap-3 p-3 rounded bg-muted/50 text-sm border border-border/50">
                         {doc.readStatus === "Complete" ? (
                           <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
                         ) : doc.readStatus === "Partial" ? (
@@ -500,9 +511,17 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                         ) : (
                           <XCircle className="h-4 w-4 text-destructive shrink-0" />
                         )}
-                        <span className="font-medium">{doc.documentName}</span>
+                        <span className="font-medium flex-1 min-w-[200px]">{doc.documentName}</span>
                         <Badge variant="secondary" className="text-xs">{doc.documentType}</Badge>
+                        {doc.issuingAuthority && (
+                          <span className="text-muted-foreground text-xs">by {doc.issuingAuthority}</span>
+                        )}
                         {doc.pageCount && <span className="text-muted-foreground text-xs">{doc.pageCount} pages</span>}
+                        {doc.languagesDetected && doc.languagesDetected.length > 0 && (
+                          <span className="text-muted-foreground text-xs">
+                            [{doc.languagesDetected.join(", ")}]
+                          </span>
+                        )}
                         {doc.ocrConfidence && (
                           <Badge 
                             variant="outline" 
@@ -516,11 +535,39 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                             OCR: {doc.ocrConfidence}
                           </Badge>
                         )}
+                        {doc.capitalGoodsListPresent && (
+                          <Badge variant="outline" className="text-xs text-success bg-success/10">
+                            ካፒታል ዕቃዎች ዝርዝር (Capital Goods List) ✓
+                          </Badge>
+                        )}
+                        {doc.annexesDetected && doc.annexesDetected.length > 0 && (
+                          <div className="w-full mt-1 pl-6 text-xs text-muted-foreground">
+                            አባሪዎች (Annexes): {doc.annexesDetected.join(", ")}
+                          </div>
+                        )}
+                        {doc.keySectionsDetected && doc.keySectionsDetected.length > 0 && (
+                          <div className="w-full mt-1 pl-6 text-xs text-muted-foreground">
+                            ቁልፍ ክፍሎች (Key sections): {doc.keySectionsDetected.join(", ")}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="p-4 rounded bg-warning/10 border border-warning/30 text-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-warning" />
+                      <span className="font-medium text-warning">የሰነድ ዝርዝር አልተገኘም (Document list not provided)</span>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      ትንተናው ተካሂዷል ግን ዝርዝር የሰነድ ማረጋገጫ አልተሰጠም። ይህ በትንተናው ትክክለኝነት ላይ ተጽዕኖ ሊኖረው ይችላል።
+                    </p>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      (Analysis completed but detailed document confirmation was not provided. This may affect the traceability of the analysis.)
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {/* License Understanding */}
               {documentComprehension.licenseUnderstanding && (
