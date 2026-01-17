@@ -452,9 +452,51 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
     return "text-muted-foreground";
   };
 
-  const allCitations = complianceItems.flatMap(item => 
-    (item.citations || []).map(c => ({ ...c, itemName: item.normalizedName }))
-  );
+  // Collect all citations from compliance items, normalizing property names
+  const allCitations = React.useMemo(() => {
+    const citationsFromItems = complianceItems.flatMap(item => 
+      (item.citations || []).map((c: any) => ({
+        documentName: c.documentName || c.document || c.source || 'Unknown Document',
+        articleSection: c.articleSection || c.article || c.section || c.reference || 'N/A',
+        pageNumber: c.pageNumber || c.page || 0,
+        quote: c.quote || c.text || c.excerpt || '',
+        relevance: c.relevance || c.reason || c.explanation || '',
+        itemName: item.normalizedName || item.invoiceItem || 'Unknown Item'
+      }))
+    ).filter(c => c.quote || c.articleSection !== 'N/A'); // Filter out empty citations
+
+    // If no citations from items, try to extract from policyBasis or policyIndex
+    if (citationsFromItems.length === 0) {
+      const policyBasis = (data as any)?.policyBasis || [];
+      const policyIndex = documentComprehension?.policyIndex || [];
+      
+      // Extract from policyBasis
+      const citationsFromPolicyBasis = policyBasis.flatMap((pb: any) => 
+        (pb.quotedClauses || []).map((quote: string, idx: number) => ({
+          documentName: pb.documentName || 'Policy Document',
+          articleSection: (pb.relevantArticles || [])[idx] || pb.relevantArticles?.[0] || 'Policy Reference',
+          pageNumber: (pb.pageNumbers || [])[idx] || pb.pageNumbers?.[0] || 0,
+          quote: quote,
+          relevance: `Referenced in policy basis for compliance analysis`,
+          itemName: 'Policy Reference'
+        }))
+      );
+
+      // Extract from policyIndex
+      const citationsFromPolicyIndex = policyIndex.map((pi: any) => ({
+        documentName: pi.documentName || 'Policy Document',
+        articleSection: pi.articleSection || 'Section Reference',
+        pageNumber: pi.pageNumber || 0,
+        quote: pi.clauseText || pi.clauseHeading || pi.scopeOfApplication || '',
+        relevance: pi.scopeOfApplication || 'Indexed policy clause',
+        itemName: 'Policy Index'
+      })).filter((c: any) => c.quote);
+
+      return [...citationsFromPolicyBasis, ...citationsFromPolicyIndex];
+    }
+
+    return citationsFromItems;
+  }, [complianceItems, data, documentComprehension]);
 
   // Show formal report view
   if (showFormalReport) {
