@@ -497,9 +497,10 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       tool_choice: { type: "function", function: { name: "return_policy_analysis" } },
     };
 
-    // Create abort controller for timeout (90 seconds max)
+    // Create abort controller for timeout (keep under typical client/proxy limits)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
+    const timeoutMs = 55_000;
+    const timeoutId = setTimeout(() => controller.abort("timeout"), timeoutMs);
 
     let response: Response;
     try {
@@ -514,35 +515,40 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       });
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
-      if (fetchError.name === "AbortError") {
-        console.error("AI gateway request timed out after 90 seconds");
-        return new Response(JSON.stringify({ 
-          error: "Analysis timed out. Try with fewer invoice items or simpler documents." 
-        }), {
-          status: 504,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      const isAbort = fetchError?.name === "AbortError" || fetchError?.message?.includes?.("aborted");
+      if (isAbort) {
+        console.error(`AI gateway request timed out after ${timeoutMs}ms`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Analysis timed out. Try again with fewer invoice items or shorter policy documents.",
+            code: "TIMEOUT",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
       throw fetchError;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds to continue." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            response.status === 429
+              ? "Rate limit exceeded. Please try again later."
+              : response.status === 402
+                ? "AI credits exhausted. Please add funds to continue."
+                : "AI service returned an error. Please retry.",
+          code: `AI_GATEWAY_${response.status}`,
+          rawErrorSnippet: errorText.slice(0, 1500),
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     let aiResponse: any;
@@ -550,18 +556,22 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       aiResponse = await response.json();
     } catch (jsonError) {
       console.error("Failed to parse AI gateway response as JSON:", jsonError);
-      return new Response(JSON.stringify({ 
-        error: "Invalid response from AI service. Please try again." 
-      }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid response from AI service. Please try again.",
+          code: "AI_GATEWAY_INVALID_JSON",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
     console.log("AI response received");
 
-    const choice = aiResponse.choices?.[0];
+    // OpenAI-compatible responses typically use `choices[0].message`.
+    // Some providers return structured content (arrays/parts). Be defensive.
+    const choice = aiResponse?.choices?.[0];
     const msg = choice?.message;
-    const finishReason = choice?.finish_reason;
+    const finishReason = choice?.finish_reason ?? choice?.finishReason ?? null;
 
     const tryParseJson = (input: string) => {
       const trimmed = input.trim();
@@ -612,12 +622,36 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       return null;
     };
 
-    const truncate = (s: string, max = 8000) => (s.length > max ? `${s.slice(0, max)}\n...[truncated ${s.length - max} chars]` : s);
+    const truncate = (s: string, max = 8000) =>
+      s.length > max ? `${s.slice(0, max)}\n...[truncated ${s.length - max} chars]` : s;
 
-    // Prefer tool-call arguments (forced JSON), otherwise fallback to content parsing.
-    const toolArgsCandidate = (msg as any)?.tool_calls?.[0]?.function?.arguments ?? (msg as any)?.function_call?.arguments;
-    const toolArgs = typeof toolArgsCandidate === "string" ? toolArgsCandidate : (toolArgsCandidate ? JSON.stringify(toolArgsCandidate) : undefined);
-    const content: string = typeof msg?.content === "string" ? msg.content : "";
+    const extractText = (value: any): string => {
+      if (!value) return "";
+      if (typeof value === "string") return value;
+      if (Array.isArray(value)) {
+        // e.g. [{type:"text", text:"..."}] or [{text:"..."}] etc.
+        return value.map((p) => (typeof p === "string" ? p : (p?.text ?? p?.content ?? ""))).join("");
+      }
+      if (typeof value === "object") {
+        // e.g. { text: "..." } or { parts: [...] }
+        if (typeof (value as any).text === "string") return (value as any).text;
+        if (Array.isArray((value as any).parts)) return extractText((value as any).parts);
+        if (Array.isArray((value as any).content)) return extractText((value as any).content);
+      }
+      return "";
+    };
+
+    // Prefer tool-call arguments (forced JSON), otherwise fallback to text parsing.
+    const toolArgsCandidate = (msg as any)?.tool_calls?.[0]?.function?.arguments ??
+      (msg as any)?.function_call?.arguments ??
+      (msg as any)?.toolCalls?.[0]?.function?.arguments;
+
+    const toolArgs = typeof toolArgsCandidate === "string"
+      ? toolArgsCandidate
+      : (toolArgsCandidate ? JSON.stringify(toolArgsCandidate) : undefined);
+
+    // Some models return structured content arrays; extract into a plain string.
+    const content: string = extractText((msg as any)?.content);
 
     let analysisResult: any = null;
 
@@ -629,31 +663,52 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       analysisResult = parseFromText(content);
     }
 
+    // If the gateway returned an error-like payload with no message, surface that.
+    if (!analysisResult && !toolArgs && !content) {
+      const aiSnippet = truncate(JSON.stringify(aiResponse ?? {}), 2000);
+      console.error("AI response had no content/tool args", { finishReason, aiSnippet });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "AI returned an empty response. Please retry.",
+          code: "AI_EMPTY_RESPONSE",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (!analysisResult) {
       const raw = toolArgs || content || "";
       const reason = finishReason === "length" ? "MODEL_OUTPUT_TRUNCATED" : "INVALID_JSON";
-      console.error("Failed to parse AI response as JSON", { finishReason, reason, hasToolArgs: !!toolArgs, contentLen: content.length });
+      console.error("Failed to parse AI response as JSON", {
+        finishReason,
+        reason,
+        hasToolArgs: !!toolArgs,
+        contentLen: content.length,
+      });
 
       // IMPORTANT: Do NOT echo the full raw model output back to the client (it can be huge and break the connection).
-      return new Response(JSON.stringify({
-        error: reason === "MODEL_OUTPUT_TRUNCATED"
-          ? "AI output was truncated. Try shorter policy docs or fewer invoice items."
-          : "AI returned an invalid response. Please retry.",
-        parseError: true,
-        parseErrorReason: reason,
-        rawResponseSnippet: truncate(raw),
-      }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            reason === "MODEL_OUTPUT_TRUNCATED"
+              ? "AI output was truncated. Try shorter policy docs or fewer invoice items."
+              : "AI returned an invalid response. Please retry.",
+          parseError: true,
+          parseErrorReason: reason,
+          rawResponseSnippet: truncate(raw),
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     // Validate that the analysis actually contains meaningful data
     const isEmptyAnalysis = (
       !analysisResult.parseError &&
       (!analysisResult.complianceItems || analysisResult.complianceItems.length === 0) &&
-      (!analysisResult.documentComprehension?.gateStatus || 
-       (analysisResult.documentComprehension?.gateStatus === "PASSED" && !analysisResult.executiveSummary?.overallStatus))
+      (!analysisResult.documentComprehension?.gateStatus ||
+        (analysisResult.documentComprehension?.gateStatus === "PASSED" && !analysisResult.executiveSummary?.overallStatus))
     );
 
     if (isEmptyAnalysis) {
@@ -664,15 +719,16 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
         complianceItemsCount: analysisResult.complianceItems?.length || 0,
         hasLicenseSnapshot: !!analysisResult.licenseSnapshot,
       });
-      return new Response(JSON.stringify({ 
-        error: "Analysis failed to produce results. The AI may have run out of processing capacity. Try with: (1) fewer invoice items, (2) shorter policy documents, or (3) simpler documents.",
-        parseError: true,
-        parseErrorReason: "EMPTY_ANALYSIS_RESULT",
-        rawResponse: JSON.stringify(analysisResult)
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "Analysis failed to produce results. Try with: (1) fewer invoice items, (2) shorter policy documents, or (3) simpler documents.",
+          parseError: true,
+          parseErrorReason: "EMPTY_ANALYSIS_RESULT",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     // Log analysis summary for debugging
@@ -695,11 +751,13 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
 
   } catch (error) {
     console.error("Analysis error:", error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : "Unknown error occurred" 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+        code: "UNHANDLED_ERROR",
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 });
