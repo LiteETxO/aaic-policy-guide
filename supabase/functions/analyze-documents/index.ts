@@ -588,32 +588,64 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       return null;
     };
 
+    const repairJson = (text: string) => {
+      // Remove common trailing commas that break JSON parsing.
+      return text.replace(/,\s*([}\]])/g, "$1");
+    };
+
+    const parseFromText = (text: string) => {
+      const cleaned = stripCodeFences(text);
+      const direct = tryParseJson(cleaned);
+      if (direct) return direct;
+
+      const extracted = extractJsonObject(cleaned);
+      if (extracted) {
+        const extractedDirect = tryParseJson(extracted);
+        if (extractedDirect) return extractedDirect;
+        const repaired = tryParseJson(repairJson(extracted));
+        if (repaired) return repaired;
+      }
+
+      const repairedDirect = tryParseJson(repairJson(cleaned));
+      if (repairedDirect) return repairedDirect;
+
+      return null;
+    };
+
+    const truncate = (s: string, max = 8000) => (s.length > max ? `${s.slice(0, max)}\n...[truncated ${s.length - max} chars]` : s);
+
     // Prefer tool-call arguments (forced JSON), otherwise fallback to content parsing.
-    const toolArgs: string | undefined = msg?.tool_calls?.[0]?.function?.arguments;
+    const toolArgsCandidate = (msg as any)?.tool_calls?.[0]?.function?.arguments ?? (msg as any)?.function_call?.arguments;
+    const toolArgs = typeof toolArgsCandidate === "string" ? toolArgsCandidate : (toolArgsCandidate ? JSON.stringify(toolArgsCandidate) : undefined);
     const content: string = typeof msg?.content === "string" ? msg.content : "";
 
     let analysisResult: any = null;
 
     if (toolArgs) {
-      analysisResult = tryParseJson(toolArgs);
+      analysisResult = parseFromText(toolArgs);
     }
 
     if (!analysisResult && content) {
-      analysisResult = tryParseJson(stripCodeFences(content));
-      if (!analysisResult) {
-        const extracted = extractJsonObject(content);
-        if (extracted) analysisResult = tryParseJson(extracted);
-      }
+      analysisResult = parseFromText(content);
     }
 
     if (!analysisResult) {
       const raw = toolArgs || content || "";
-      console.error("Failed to parse AI response as JSON");
-      analysisResult = {
-        rawResponse: raw,
+      const reason = finishReason === "length" ? "MODEL_OUTPUT_TRUNCATED" : "INVALID_JSON";
+      console.error("Failed to parse AI response as JSON", { finishReason, reason, hasToolArgs: !!toolArgs, contentLen: content.length });
+
+      // IMPORTANT: Do NOT echo the full raw model output back to the client (it can be huge and break the connection).
+      return new Response(JSON.stringify({
+        error: reason === "MODEL_OUTPUT_TRUNCATED"
+          ? "AI output was truncated. Try shorter policy docs or fewer invoice items."
+          : "AI returned an invalid response. Please retry.",
         parseError: true,
-        parseErrorReason: finishReason === "length" ? "MODEL_OUTPUT_TRUNCATED" : "INVALID_JSON",
-      };
+        parseErrorReason: reason,
+        rawResponseSnippet: truncate(raw),
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Validate that the analysis actually contains meaningful data
