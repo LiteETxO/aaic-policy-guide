@@ -309,7 +309,13 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const officerActionsNeeded = data?.officerActionsNeeded || [];
 
   // Handle empty analysis results (AI returned structure but no actual data)
-  if (complianceItems.length === 0 && !documentComprehension?.blockedReason && documentComprehension?.gateStatus !== "BLOCKED") {
+  // Only show this if we have data but it's empty - not if data is undefined/null
+  const isEmptyAnalysis = data && 
+    complianceItems.length === 0 && 
+    !documentComprehension?.blockedReason && 
+    documentComprehension?.gateStatus !== "BLOCKED";
+
+  if (isEmptyAnalysis) {
     return (
       <section className="py-16 bg-muted/20">
         <div className="container">
