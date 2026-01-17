@@ -1,3 +1,4 @@
+export { default as DocumentPreparationStep } from "./DocumentPreparationStep";
 export { default as PolicyReadinessStep } from "./PolicyReadinessStep";
 export { default as CaseReadinessStep } from "./CaseReadinessStep";
 export { default as ItemAnalysisStep } from "./ItemAnalysisStep";

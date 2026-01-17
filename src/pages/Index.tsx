@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout";
 import { 
-  PolicyReadinessStep, 
-  CaseReadinessStep, 
+  DocumentPreparationStep,
   ItemAnalysisStep,
   EvidenceReviewStep,
   ExecutiveSummaryStep,
@@ -23,15 +22,18 @@ const Index = () => {
   const { data: policyDocuments = [], isLoading: policyLoading } = usePolicyDocuments();
   const { status } = useWorkflowStatus();
 
-  // Determine completed steps based on workflow status
+  // Determine completed steps based on workflow status (now 5 steps)
   const completedSteps = useMemo(() => {
     const completed: number[] = [];
-    if (status.policyLibraryReady && policyDocuments.length > 0) completed.push(1);
-    if (status.caseFilesReady) completed.push(2);
+    // Step 1: Document Preparation - complete when policy & case files ready
+    if (status.policyLibraryReady && policyDocuments.length > 0 && status.caseFilesReady) {
+      completed.push(1);
+    }
+    // Steps 2-4: Complete after analysis
     if (analysisData?.complianceItems?.length > 0) {
-      completed.push(3);
-      completed.push(4);
-      completed.push(5);
+      completed.push(2); // Item Analysis
+      completed.push(3); // Evidence Review
+      completed.push(4); // Executive Summary
     }
     return completed;
   }, [status, policyDocuments, analysisData]);
@@ -47,7 +49,7 @@ const Index = () => {
 
   const handleAnalyze = (result: any) => {
     setAnalysisData(result);
-    setCurrentStep(3); // Move to Item Analysis after analysis
+    setCurrentStep(2); // Move to Item Analysis after analysis
   };
 
   const handleStepClick = (step: number) => {
@@ -111,12 +113,12 @@ const Index = () => {
     };
   }, [analysisData, analysisItems]);
 
-  // Render step content based on current step
+  // Render step content based on current step (now 5 steps)
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
         return (
-          <PolicyReadinessStep 
+          <DocumentPreparationStep 
             policyDocuments={policyDocuments.map(doc => ({
               id: doc.id,
               name: doc.name,
@@ -125,14 +127,6 @@ const Index = () => {
               status: doc.status,
               documentType: doc.document_type,
             }))}
-            isLoading={policyLoading}
-          >
-            <PolicyLibrary />
-          </PolicyReadinessStep>
-        );
-      case 2:
-        return (
-          <CaseReadinessStep
             uploadedDocuments={status.documentStatuses.map((d, i) => ({
               id: `doc-${i}`,
               name: d.name,
@@ -141,13 +135,15 @@ const Index = () => {
             }))}
             licenseUploaded={status.documentStatuses.some(d => d.type === "license" && d.status === "complete")}
             invoiceUploaded={status.documentStatuses.some(d => d.type === "invoice" && d.status === "complete")}
+            isPolicyLoading={policyLoading}
           >
+            <PolicyLibrary />
             <DocumentUpload onAnalyze={handleAnalyze} />
-          </CaseReadinessStep>
+          </DocumentPreparationStep>
         );
-      case 3:
+      case 2:
         return <ItemAnalysisStep items={analysisItems} />;
-      case 4:
+      case 3:
         return (
           <EvidenceReviewStep 
             evidenceItems={evidenceItems}
@@ -155,11 +151,11 @@ const Index = () => {
             onItemSelect={setSelectedEvidenceItem}
           />
         );
-      case 5:
+      case 4:
         return <ExecutiveSummaryStep summary={executiveSummary} />;
-      case 6:
+      case 5:
         return (
-          <FormalReportStep isReady={completedSteps.includes(5)}>
+          <FormalReportStep isReady={completedSteps.includes(4)}>
             {analysisData && <ReportGenerator analysisData={analysisData} />}
           </FormalReportStep>
         );
