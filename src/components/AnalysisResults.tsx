@@ -866,7 +866,9 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {officerActionsNeeded.map((action, index) => (
+                {officerActionsNeeded
+                  .filter((action): action is ActionItem => action != null && typeof action.type === 'string')
+                  .map((action, index) => (
                   <div 
                     key={index}
                     className={cn(
@@ -890,13 +892,13 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                             action.severity === "medium" && "border-warning text-warning"
                           )}
                         >
-                          {action.severity} priority
+                          {action.severity || 'medium'} priority
                         </Badge>
                         <Badge variant="secondary" className="text-xs capitalize">
-                          {action.type.replace("-", " ")}
+                          {(action.type || 'unknown').replace(/-/g, " ")}
                         </Badge>
                       </div>
-                      <p className="text-sm">{action.description}</p>
+                      <p className="text-sm">{action.description || 'No description provided'}</p>
                     </div>
                   </div>
                 ))}
