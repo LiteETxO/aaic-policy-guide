@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { 
   CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Scale, 
   AlertCircle, BookOpen, Quote, ChevronDown, ChevronRight, ExternalLink,
-  ClipboardList, AlertOctagon, FileCheck, FileWarning, FileOutput, LayoutList
+  ClipboardList, AlertOctagon, FileCheck, FileWarning, FileOutput, LayoutList,
+  Shield, Gauge
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import { ReportGenerator } from "@/components/report/ReportGenerator";
+import { ConfidenceBadge, EvidenceChip, type ConfidenceLevel, type EvidenceData } from "@/components/gamification";
 
 // Types matching the new AI output format
 type EligibilityStatus =
@@ -157,13 +159,26 @@ interface AnalysisResultsProps {
   data?: AnalysisData;
 }
 
-// Eligibility status config (Amharic-first)
-const eligibilityConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string }> = {
+// Helper function to determine confidence level from item data
+const getItemConfidence = (item: ComplianceItem): ConfidenceLevel => {
+  // High confidence: has citations, has clear match result, has reasoning
+  const hasCitations = item.citations && item.citations.length > 0;
+  const hasReasoning = item.reasoning && item.reasoning.length > 0;
+  const hasGoodMatch = item.matchResult === "Exact" || 
+    (item.matchCandidates && item.matchCandidates.some(m => m.confidence === "High"));
+  
+  if (hasCitations && hasReasoning && hasGoodMatch) return "high";
+  if (hasCitations || hasReasoning) return "medium";
+  return "low";
+};
+
+// Eligibility status config (Amharic-first) - Updated with safety-focused language
+const eligibilityConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string; safeLabel?: string }> = {
   "Eligible – Listed Capital Good": { icon: CheckCircle2, color: "text-success", label: "ብቁ - ዝርዝር (Eligible - Listed)", bgColor: "bg-success/10" },
   "Eligible – Listed Capital Good (Mapped)": { icon: CheckCircle2, color: "text-success", label: "ብቁ - ተዛምዷል (Eligible - Mapped)", bgColor: "bg-success/10" },
   "Eligible – Essential Capital Good (Not Listed)": { icon: CheckCircle2, color: "text-emerald-600", label: "ብቁ - አስፈላጊ (Eligible - Essential)", bgColor: "bg-emerald-500/10" },
   "Requires Clarification": { icon: HelpCircle, color: "text-blue-500", label: "ማብራሪያ ያስፈልጋል (Needs Clarification)", bgColor: "bg-blue-500/10" },
-  "Not Eligible": { icon: XCircle, color: "text-destructive", label: "ብቁ አይደለም (Not Eligible)", bgColor: "bg-destructive/10" },
+  "Not Eligible": { icon: Shield, color: "text-destructive", label: "ውሳኔ ታግዷል — ማስረጃ ይጎድላል (Decision Blocked — Evidence Missing)", bgColor: "bg-destructive/10", safeLabel: "ተጨማሪ ማስረጃ ያስፈልጋል" },
 };
 
 // License alignment config (Amharic-first)
@@ -855,6 +870,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                       <TableHead className="font-semibold">ቁጥር (Item #)</TableHead>
                       <TableHead className="font-semibold">የደረሰኝ ዕቃ (Invoice Item)</TableHead>
                       <TableHead className="font-semibold">መደበኛ ስም (Normalized Name)</TableHead>
+                      <TableHead className="font-semibold">እምነት (Confidence)</TableHead>
                       <TableHead className="font-semibold">የፍቃድ ማስማማት (License Align.)</TableHead>
                       <TableHead className="font-semibold">ብቁነት (Eligibility)</TableHead>
                     </TableRow>
@@ -880,12 +896,13 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                           <TableCell className="font-mono text-sm">{item.itemNumber}</TableCell>
                           <TableCell className="text-sm max-w-[200px] truncate">{item.invoiceItem}</TableCell>
                           <TableCell className="font-medium">{item.normalizedName}</TableCell>
+                          <TableCell><ConfidenceBadge level={getItemConfidence(item)} size="sm" showLabel={false} /></TableCell>
                           <TableCell><LicenseBadge status={item.licenseAlignment} /></TableCell>
                           <TableCell><EligibilityBadge status={item.eligibilityStatus || item.policyCompliance} /></TableCell>
                         </TableRow>
                         {expandedRows.includes(item.itemNumber) && (
                           <TableRow>
-                            <TableCell colSpan={6} className="bg-muted/20 p-0">
+                            <TableCell colSpan={7} className="bg-muted/20 p-0">
                               <div className="p-6 space-y-6">
                               {/* License Evidence */}
                                 {item.licenseEvidence && item.licenseEvidence.trim() !== '' && (
