@@ -1,11 +1,14 @@
 import { 
-  FileText, BookOpen, Upload, CheckCircle2, XCircle, AlertTriangle, Lock, Gauge 
+  FileText, BookOpen, Upload, CheckCircle2, XCircle, AlertTriangle, Lock, Gauge, Eye, Plus 
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { AnalysisHistoryPanel } from "@/components/AnalysisHistoryPanel";
+import type { AnalysisSession } from "@/hooks/useAnalysisSessions";
 
 interface PolicyDocument {
   id: string;
@@ -33,6 +36,16 @@ interface DocumentPreparationStepProps {
   invoiceUploaded: boolean;
   isPolicyLoading?: boolean;
   children?: React.ReactNode;
+  // Analysis session management
+  hasActiveAnalysis?: boolean;
+  onClearAnalysis?: () => void;
+  onViewResults?: () => void;
+  sessions?: AnalysisSession[];
+  sessionsLoading?: boolean;
+  currentSessionId?: string | null;
+  onLoadSession?: (session: AnalysisSession) => void;
+  onDeleteSession?: (id: string) => void;
+  isDeleting?: boolean;
 }
 
 /**
@@ -41,6 +54,7 @@ interface DocumentPreparationStepProps {
  * - Policy Library readiness
  * - Case document uploads (license + invoice)
  * - Combined readiness meter
+ * - Analysis history panel
  * 
  * Does NOT show:
  * - Executive Summary
@@ -54,6 +68,15 @@ const DocumentPreparationStep = ({
   invoiceUploaded,
   isPolicyLoading,
   children,
+  hasActiveAnalysis,
+  onClearAnalysis,
+  onViewResults,
+  sessions = [],
+  sessionsLoading = false,
+  currentSessionId,
+  onLoadSession,
+  onDeleteSession,
+  isDeleting,
 }: DocumentPreparationStepProps) => {
   const totalPolicyDocs = policyDocuments.length;
   const hasCapitalGoodsList = policyDocuments.some((d) => d.capitalGoodsListPresent);
@@ -149,6 +172,35 @@ const DocumentPreparationStep = ({
         </div>
       </div>
 
+      {/* Active Analysis Banner */}
+      {hasActiveAnalysis && (
+        <Card className="border-l-4 border-l-success bg-success/5">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 text-success" />
+                <div>
+                  <p className="font-medium text-success">ንቁ ትንታኔ አለ (Active Analysis Exists)</p>
+                  <p className="text-sm text-muted-foreground">
+                    ውጤቱን ለማየት ወይም አዲስ ጉዳይ ለመጀመር ይምረጡ
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="default" size="sm" onClick={onViewResults}>
+                  <Eye className="h-4 w-4 mr-1" />
+                  ውጤቱን ይመልከቱ (View Results)
+                </Button>
+                <Button variant="outline" size="sm" onClick={onClearAnalysis}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  አዲስ ጀምር (Start New)
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Overall Readiness Card */}
       <Card className="border-l-4 border-l-primary">
         <CardHeader className="pb-3">
@@ -231,6 +283,18 @@ const DocumentPreparationStep = ({
 
       {/* Content (PolicyLibrary + DocumentUpload passed as children) */}
       {children}
+
+      {/* Analysis History Panel */}
+      {onLoadSession && onDeleteSession && (
+        <AnalysisHistoryPanel
+          sessions={sessions}
+          isLoading={sessionsLoading}
+          currentSessionId={currentSessionId ?? null}
+          onLoadSession={onLoadSession}
+          onDeleteSession={onDeleteSession}
+          isDeleting={isDeleting}
+        />
+      )}
 
       {/* No conclusions notice */}
       <div className="flex items-center gap-2 p-4 rounded-lg bg-muted/30 border border-border text-sm text-muted-foreground">
