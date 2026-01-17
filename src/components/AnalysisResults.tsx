@@ -313,10 +313,12 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
 
   // Handle empty analysis results (AI returned structure but no actual data)
   // Only show this if we have data but it's empty - not if data is undefined/null
+  // Also exclude if documentComprehension exists (we want to show that card)
   const isEmptyAnalysis = data && 
     complianceItems.length === 0 && 
     !documentComprehension?.blockedReason && 
-    documentComprehension?.gateStatus !== "BLOCKED";
+    documentComprehension?.gateStatus !== "BLOCKED" &&
+    !documentComprehension; // Don't show empty state if we have documentComprehension
 
   if (isEmptyAnalysis) {
     return (
