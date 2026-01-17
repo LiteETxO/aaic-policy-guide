@@ -14,17 +14,44 @@ import { cn } from "@/lib/utils";
 import { ReportGenerator } from "@/components/report/ReportGenerator";
 import { ConfidenceBadge, EvidenceChip, type ConfidenceLevel, type EvidenceData } from "@/components/gamification";
 
-// Types matching the new AI output format
+// Types matching the new AI output format with Policy Clause Index support
 type EligibilityStatus =
   | "Eligible – Listed Capital Good" 
   | "Eligible – Listed Capital Good (Mapped)" 
   | "Eligible – Essential Capital Good (Not Listed)" 
+  | "Decision Deferred — Citation Incomplete"
   | "Requires Clarification" 
-  | "Not Eligible";
+  | "Not Eligible"
+  | "Policy Gap – Admin Action Required";
 
 type LicenseAlignment = "Aligned" | "Conditional" | "Needs Clarification" | "Not Aligned";
 
+type ClauseSectionType = "Article" | "Annex" | "Schedule" | "Item";
+type ClauseInclusionType = "enabling" | "restrictive" | "exclusion" | "procedural";
+type ClauseAppliesTo = "capital_goods" | "customs_duty" | "income_tax" | "essentiality" | "exclusion" | "general_incentive";
+
+// Policy Clause Index Entry - MANDATORY for all citations
+interface PolicyClause {
+  clause_id: string;
+  policy_document_name: string;
+  issuing_authority?: string;
+  policy_version?: string;
+  language: "Amharic" | "English" | "Mixed";
+  section_type: ClauseSectionType;
+  section_number: string;
+  page_number: number;
+  clause_heading: string;
+  clause_heading_amharic?: string;
+  clause_text: string;
+  clause_text_amharic?: string;
+  keywords: string[];
+  applies_to: ClauseAppliesTo[];
+  inclusion_type: ClauseInclusionType;
+  notes?: string;
+}
+
 interface Citation {
+  clause_id?: string; // Reference to policyClauseIndex - REQUIRED in new format
   documentName: string;
   articleSection: string;
   pageNumber: number;
@@ -37,11 +64,12 @@ interface MatchCandidate {
   similarities: string;
   differences: string;
   confidence: "High" | "Medium" | "Low";
+  sourceClauseId?: string;
 }
 
 interface ReasoningPoint {
   point: string;
-  type: "listed-match" | "mapped-match" | "essential-inclusion" | "exclusion" | "ambiguity" | "match" | "assumption-avoided";
+  type: "listed-match" | "mapped-match" | "essential-inclusion" | "exclusion" | "ambiguity" | "match" | "assumption-avoided" | "clause-reference";
 }
 
 interface EssentialityAnalysis {
@@ -49,6 +77,8 @@ interface EssentialityAnalysis {
   operationalLink: string;
   capitalNature: string;
   noProhibition: string;
+  testResult?: "PASSED" | "FAILED" | "INCONCLUSIVE";
+  supportingClauseIds?: string[];
 }
 
 interface ComplianceItem {
@@ -58,17 +88,29 @@ interface ComplianceItem {
   category?: string;
   specs?: string;
   invoiceRef?: string;
-  matchResult?: "Exact" | "Mapped" | "Not Matched";
+  matchResult?: "Exact" | "Mapped" | "Essential" | "Not Matched";
   matchCandidates?: MatchCandidate[];
   eligibilityStatus?: EligibilityStatus;
   eligibilityPath?: string;
   licenseAlignment: LicenseAlignment;
   licenseEvidence: string;
   citations: Citation[];
+  referencedClauseIds?: string[]; // Array of clause_ids from policyClauseIndex
   essentialityAnalysis?: EssentialityAnalysis;
   reasoning: ReasoningPoint[];
-  // Legacy support
   policyCompliance?: string;
+  notEligibleJustification?: string;
+}
+
+interface PolicyClauseIndexSummary {
+  totalClausesIndexed: number;
+  clauseIdsAvailable: string[];
+  capitalGoodsClauses: number;
+  essentialityClauses: number;
+  exclusionClauses: number;
+  generalIncentiveClauses: number;
+  isComplete: boolean;
+  missingClauseTypes?: ClauseAppliesTo[];
 }
 
 interface DocumentComprehension {
@@ -87,67 +129,91 @@ interface DocumentComprehension {
     articlesIndexed?: Array<{
       articleNumber: string;
       page: number;
-      clauseSummary: string;
+      clauseSummary?: string;
     }>;
     unreadablePages?: number[];
     readStatus?: string;
+    clausesExtracted?: number;
   }>;
   policyIndex?: Array<{
     documentName: string;
     articleSection: string;
     pageNumber: number;
     clauseHeading: string;
+    clauseHeadingAmharic?: string;
+    clauseText?: string;
     scopeOfApplication: string;
     keywords: string[];
+    clause_id?: string;
   }>;
+  policyClauseIndex?: PolicyClause[];
+  policyClauseIndexSummary?: PolicyClauseIndexSummary;
   licenseUnderstanding?: {
     licensedActivity: string;
+    licensedActivityAmharic?: string;
     scopeLimitations: string;
     conditions: string;
+    licenseNumber?: string;
     extractionStatus: string;
   };
   invoiceUnderstanding?: {
     totalLineItems: number;
     itemsWithSpecs: number;
     ambiguousItems: number;
+    invoiceLanguage?: string;
     readabilityStatus: string;
   };
   analysisPermissionStatement?: string;
 }
 
 interface ActionItem {
-  type: "missing" | "unreadable" | "conflict" | "policy-gap" | "missing-evidence" | "ambiguous-mapping" | "document-ingestion-blocked";
+  type: "missing" | "unreadable" | "conflict" | "policy-gap" | "missing-evidence" | "ambiguous-mapping" | "document-ingestion-blocked" | "citation-incomplete" | "essentiality-review";
   description: string;
+  descriptionAmharic?: string;
   severity: "high" | "medium" | "low";
   relatedItems?: number[];
+  whatIsMissing?: string;
+  whyItMatters?: string;
+  resolutionAction?: string;
+  missingClauseTypes?: ClauseAppliesTo[];
 }
 
 interface AnalysisCompleteness {
   totalInvoiceItems: number;
   analyzedItems: number;
   isComplete: boolean;
-  skippedItems?: string[];
+  skippedItems?: string[] | number[];
   completenessNote?: string;
+  itemsWithValidCitations?: number;
+  itemsDeferredForCitations?: number;
 }
 
 interface AnalysisData {
   documentComprehension?: DocumentComprehension;
   executiveSummary?: {
     overallStatus: string;
+    overallStatusAmharic?: string;
     eligibleCount?: number;
     clarificationCount?: number;
     notEligibleCount?: number;
+    deferredCount?: number;
     topIssues: string[];
+    topIssuesAmharic?: string[];
     additionalInfoNeeded: string[];
+    recommendation?: string;
+    clauseIndexCompleteness?: string;
+    notEligibleJustification?: string;
   };
   licenseSnapshot?: {
     licensedActivity: string;
+    licensedActivityAmharic?: string;
     sector: string;
     scopeOfOperation: string;
     restrictions: string;
     licenseNumber?: string;
     issueDate?: string;
   };
+  policyClauseIndex?: PolicyClause[];
   complianceItems?: ComplianceItem[];
   analysisCompleteness?: AnalysisCompleteness;
   officerActionsNeeded?: ActionItem[];
@@ -177,7 +243,9 @@ const eligibilityConfig: Record<string, { icon: React.ElementType; color: string
   "Eligible – Listed Capital Good": { icon: CheckCircle2, color: "text-success", label: "ብቁ - ዝርዝር (Eligible - Listed)", bgColor: "bg-success/10" },
   "Eligible – Listed Capital Good (Mapped)": { icon: CheckCircle2, color: "text-success", label: "ብቁ - ተዛምዷል (Eligible - Mapped)", bgColor: "bg-success/10" },
   "Eligible – Essential Capital Good (Not Listed)": { icon: CheckCircle2, color: "text-emerald-600", label: "ብቁ - አስፈላጊ (Eligible - Essential)", bgColor: "bg-emerald-500/10" },
+  "Decision Deferred — Citation Incomplete": { icon: AlertCircle, color: "text-warning", label: "ውሳኔ ተዘግቷል — ማስረጃ አልተሟላም (Citation Incomplete)", bgColor: "bg-warning/10" },
   "Requires Clarification": { icon: HelpCircle, color: "text-blue-500", label: "ማብራሪያ ያስፈልጋል (Needs Clarification)", bgColor: "bg-blue-500/10" },
+  "Policy Gap – Admin Action Required": { icon: AlertOctagon, color: "text-destructive", label: "የፖሊሲ ክፍተት — አስተዳዳሪ እርምጃ ያስፈልጋል (Policy Gap)", bgColor: "bg-destructive/10" },
   "Not Eligible": { icon: Shield, color: "text-destructive", label: "ውሳኔ ታግዷል — ማስረጃ ይጎድላል (Decision Blocked — Evidence Missing)", bgColor: "bg-destructive/10", safeLabel: "ተጨማሪ ማስረጃ ያስፈልጋል" },
 };
 

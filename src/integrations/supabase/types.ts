@@ -118,6 +118,92 @@ export type Database = {
           },
         ]
       }
+      policy_clauses: {
+        Row: {
+          applies_to: Database["public"]["Enums"]["clause_applies_to"][] | null
+          clause_heading: string
+          clause_heading_amharic: string | null
+          clause_id: string
+          clause_text: string
+          clause_text_amharic: string | null
+          created_at: string
+          id: string
+          inclusion_type: Database["public"]["Enums"]["clause_inclusion_type"]
+          is_verified: boolean | null
+          issuing_authority: string | null
+          keywords: string[] | null
+          language: string
+          notes: string | null
+          page_number: number
+          policy_document_id: string | null
+          policy_document_name: string
+          policy_version: string | null
+          section_number: string
+          section_type: Database["public"]["Enums"]["clause_section_type"]
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          applies_to?: Database["public"]["Enums"]["clause_applies_to"][] | null
+          clause_heading: string
+          clause_heading_amharic?: string | null
+          clause_id: string
+          clause_text: string
+          clause_text_amharic?: string | null
+          created_at?: string
+          id?: string
+          inclusion_type?: Database["public"]["Enums"]["clause_inclusion_type"]
+          is_verified?: boolean | null
+          issuing_authority?: string | null
+          keywords?: string[] | null
+          language?: string
+          notes?: string | null
+          page_number: number
+          policy_document_id?: string | null
+          policy_document_name: string
+          policy_version?: string | null
+          section_number: string
+          section_type: Database["public"]["Enums"]["clause_section_type"]
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          applies_to?: Database["public"]["Enums"]["clause_applies_to"][] | null
+          clause_heading?: string
+          clause_heading_amharic?: string | null
+          clause_id?: string
+          clause_text?: string
+          clause_text_amharic?: string | null
+          created_at?: string
+          id?: string
+          inclusion_type?: Database["public"]["Enums"]["clause_inclusion_type"]
+          is_verified?: boolean | null
+          issuing_authority?: string | null
+          keywords?: string[] | null
+          language?: string
+          notes?: string | null
+          page_number?: number
+          policy_document_id?: string | null
+          policy_document_name?: string
+          policy_version?: string | null
+          section_number?: string
+          section_type?: Database["public"]["Enums"]["clause_section_type"]
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policy_clauses_policy_document_id_fkey"
+            columns: ["policy_document_id"]
+            isOneToOne: false
+            referencedRelation: "policy_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       policy_documents: {
         Row: {
           added_by: string | null
@@ -242,7 +328,19 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      clause_applies_to:
+        | "capital_goods"
+        | "customs_duty"
+        | "income_tax"
+        | "essentiality"
+        | "exclusion"
+        | "general_incentive"
+      clause_inclusion_type:
+        | "enabling"
+        | "restrictive"
+        | "exclusion"
+        | "procedural"
+      clause_section_type: "Article" | "Annex" | "Schedule" | "Item"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -369,6 +467,22 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      clause_applies_to: [
+        "capital_goods",
+        "customs_duty",
+        "income_tax",
+        "essentiality",
+        "exclusion",
+        "general_incentive",
+      ],
+      clause_inclusion_type: [
+        "enabling",
+        "restrictive",
+        "exclusion",
+        "procedural",
+      ],
+      clause_section_type: ["Article", "Annex", "Schedule", "Item"],
+    },
   },
 } as const
