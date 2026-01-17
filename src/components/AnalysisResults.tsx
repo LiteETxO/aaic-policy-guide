@@ -749,16 +749,18 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                           <TableRow>
                             <TableCell colSpan={6} className="bg-muted/20 p-0">
                               <div className="p-6 space-y-6">
-                                {/* License Evidence */}
-                                <div>
-                                  <h5 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                                    <FileText className="h-4 w-4 text-primary" />
-                                    የፍቃድ ማስረጃ (License Evidence)
-                                  </h5>
-                                  <p className="text-sm text-muted-foreground bg-background p-3 rounded border">
-                                    {item.licenseEvidence}
-                                  </p>
-                                </div>
+                              {/* License Evidence */}
+                                {item.licenseEvidence && item.licenseEvidence.trim() !== '' && (
+                                  <div>
+                                    <h5 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                                      <FileText className="h-4 w-4 text-primary" />
+                                      የፍቃድ ማስረጃ (License Evidence)
+                                    </h5>
+                                    <p className="text-sm text-muted-foreground bg-background p-3 rounded border">
+                                      {item.licenseEvidence}
+                                    </p>
+                                  </div>
+                                )}
 
                                 {/* Citations */}
                                 {item.citations && item.citations.length > 0 && (
