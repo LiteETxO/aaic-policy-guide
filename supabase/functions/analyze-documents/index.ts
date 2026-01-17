@@ -1028,6 +1028,39 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       );
     }
 
+    // Normalize inconsistent model shapes (some models return string arrays)
+    try {
+      const dc = analysisResult?.documentComprehension;
+      if (dc && Array.isArray(dc.documents)) {
+        const docs = dc.documents;
+        if (docs.length > 0 && typeof docs[0] === "string") {
+          dc.documents = docs.map((name: string) => {
+            const lower = String(name).toLowerCase();
+            const documentType =
+              lower.includes("invoice")
+                ? "Invoice"
+                : lower.includes("permit") || lower.includes("license")
+                  ? "License"
+                  : lower.includes("directive") ||
+                      lower.includes("proclamation") ||
+                      lower.includes("annex") ||
+                      lower.includes("policy") ||
+                      lower.includes("list")
+                    ? "Policy"
+                    : "Document";
+
+            return {
+              documentName: String(name),
+              documentType,
+              readStatus: "Complete",
+            };
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to normalize documentComprehension.documents", e);
+    }
+
     // Validate that the analysis actually contains meaningful data
     const isEmptyAnalysis = (
       !analysisResult.parseError &&
