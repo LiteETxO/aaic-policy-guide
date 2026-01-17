@@ -255,8 +255,9 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   // Handle parse error or raw response
   if (data?.parseError && data?.rawResponse) {
     const repaired = tryRepairJson(data.rawResponse);
-    if (repaired) {
+    if (repaired && !repaired.parseError) {
       // Re-render using the repaired JSON so the UI shows the normal report view.
+      // Ensure repaired data won't trigger another repair loop
       return <AnalysisResults data={repaired} />;
     }
 
