@@ -315,9 +315,57 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const licenseSnapshot = data?.licenseSnapshot;
   const documentComprehension = data?.documentComprehension;
   const analysisCompleteness = data?.analysisCompleteness;
+
+  // Normalize documents list (backend may return string[] or object[])
+  const documentsRead = React.useMemo(() => {
+    const docs: any = (documentComprehension as any)?.documents;
+    if (!Array.isArray(docs)) return [] as DocumentComprehension["documents"];
+
+    return docs.map((doc: any) => {
+      if (typeof doc === "string") {
+        const name = doc;
+        const lower = name.toLowerCase();
+        const documentType =
+          lower.includes("invoice")
+            ? "Invoice"
+            : lower.includes("permit") || lower.includes("license")
+              ? "License"
+              : lower.includes("directive") ||
+                  lower.includes("proclamation") ||
+                  lower.includes("annex") ||
+                  lower.includes("policy") ||
+                  lower.includes("list")
+                ? "Policy"
+                : "Document";
+
+        return {
+          documentName: name,
+          documentType,
+          readStatus: "Complete",
+        };
+      }
+
+      if (doc && typeof doc === "object") {
+        return {
+          ...doc,
+          documentName: doc.documentName ?? doc.name ?? doc.title ?? "Document",
+          documentType: doc.documentType ?? "Document",
+          readStatus: doc.readStatus ?? "Complete",
+        };
+      }
+
+      return {
+        documentName: String(doc),
+        documentType: "Document",
+        readStatus: "Complete",
+      };
+    });
+  }, [documentComprehension]);
+
   // Filter officer actions to only include valid items with a type property
   const officerActionsNeeded = (data?.officerActionsNeeded || [])
     .filter((action): action is ActionItem => action != null && typeof action.type === 'string' && action.type.length > 0);
+
 
   // Handle empty analysis results (AI returned structure but no actual data)
   // Only show this if we have data but it's empty - not if data is undefined/null
@@ -495,15 +543,16 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
               <div>
                 <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
-                  የተነበቡ ሰነዶች (Documents Read) 
-                  {documentComprehension.documents && documentComprehension.documents.length > 0 && (
-                    <span>({documentComprehension.documents.length})</span>
-                  )}
+                  የተነበቡ ሰነዶች (Documents Read)
+                  {documentsRead.length > 0 && <span>({documentsRead.length})</span>}
                 </h5>
-                {documentComprehension.documents && documentComprehension.documents.length > 0 ? (
+                {documentsRead.length > 0 ? (
                   <div className="grid gap-2">
-                    {documentComprehension.documents.map((doc, i) => (
-                      <div key={i} className="flex flex-wrap items-center gap-3 p-3 rounded bg-muted/50 text-sm border border-border/50">
+                    {documentsRead.map((doc, i) => (
+                      <div
+                        key={i}
+                        className="flex flex-wrap items-center gap-3 p-3 rounded bg-muted/50 text-sm border border-border/50"
+                      >
                         {doc.readStatus === "Complete" ? (
                           <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
                         ) : doc.readStatus === "Partial" ? (
@@ -518,13 +567,11 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                         )}
                         {doc.pageCount && <span className="text-muted-foreground text-xs">{doc.pageCount} pages</span>}
                         {doc.languagesDetected && doc.languagesDetected.length > 0 && (
-                          <span className="text-muted-foreground text-xs">
-                            [{doc.languagesDetected.join(", ")}]
-                          </span>
+                          <span className="text-muted-foreground text-xs">[{doc.languagesDetected.join(", ")}]</span>
                         )}
                         {doc.ocrConfidence && (
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className={cn(
                               "text-xs",
                               doc.ocrConfidence === "High" && "text-success",
@@ -535,7 +582,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                             OCR: {doc.ocrConfidence}
                           </Badge>
                         )}
-                        {doc.capitalGoodsListPresent && (
+                        {doc.capitalGoodsListPresent === true && (
                           <Badge variant="outline" className="text-xs text-success bg-success/10">
                             ካፒታል ዕቃዎች ዝርዝር (Capital Goods List) ✓
                           </Badge>
@@ -559,11 +606,11 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                       <AlertTriangle className="h-4 w-4 text-warning" />
                       <span className="font-medium text-warning">የሰነድ ዝርዝር አልተገኘም (Document list not provided)</span>
                     </div>
-                    <p className="text-muted-foreground text-xs">
-                      ትንተናው ተካሂዷል ግን ዝርዝር የሰነድ ማረጋገጫ አልተሰጠም። ይህ በትንተናው ትክክለኝነት ላይ ተጽዕኖ ሊኖረው ይችላል።
+                    <p className="text-muted-foreground">
+                      የተነበቡ ሰነዶች ዝርዝር በትንተና ውጤት ውስጥ አልተሰጠም። ይህ የኦዲት እና የማስረጃ ክትትል ጥራት ሊቀንስ ይችላል።
                     </p>
-                    <p className="text-muted-foreground text-xs mt-1">
-                      (Analysis completed but detailed document confirmation was not provided. This may affect the traceability of the analysis.)
+                    <p className="text-muted-foreground mt-2">
+                      The backend did not include a detailed list of documents read. This reduces traceability.
                     </p>
                   </div>
                 )}
