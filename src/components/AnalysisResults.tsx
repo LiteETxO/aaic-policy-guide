@@ -307,7 +307,9 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const licenseSnapshot = data?.licenseSnapshot;
   const documentComprehension = data?.documentComprehension;
   const analysisCompleteness = data?.analysisCompleteness;
-  const officerActionsNeeded = data?.officerActionsNeeded || [];
+  // Filter officer actions to only include valid items with a type property
+  const officerActionsNeeded = (data?.officerActionsNeeded || [])
+    .filter((action): action is ActionItem => action != null && typeof action.type === 'string' && action.type.length > 0);
 
   // Handle empty analysis results (AI returned structure but no actual data)
   // Only show this if we have data but it's empty - not if data is undefined/null
@@ -866,9 +868,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {officerActionsNeeded
-                  .filter((action): action is ActionItem => action != null && typeof action.type === 'string')
-                  .map((action, index) => (
+                {officerActionsNeeded.map((action, index) => (
                   <div 
                     key={index}
                     className={cn(
