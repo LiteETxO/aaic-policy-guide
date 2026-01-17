@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      analysis_cache: {
+        Row: {
+          analysis_result: Json
+          created_at: string | null
+          document_hash: string
+          expires_at: string | null
+          id: string
+        }
+        Insert: {
+          analysis_result: Json
+          created_at?: string | null
+          document_hash: string
+          expires_at?: string | null
+          id?: string
+        }
+        Update: {
+          analysis_result?: Json
+          created_at?: string | null
+          document_hash?: string
+          expires_at?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
       analysis_sessions: {
         Row: {
           analysis_result: Json | null

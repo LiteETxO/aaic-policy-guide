@@ -1,5 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+
+// Generate a SHA-256 hash of input strings for cache key
+async function generateDocumentHash(licenseText: string, invoiceText: string, policyDocs: any[]): Promise<string> {
+  const policyContent = policyDocs
+    .sort((a, b) => (a.id || '').localeCompare(b.id || ''))
+    .map(doc => `${doc.id}:${doc.content_markdown || doc.content_text || ''}`)
+    .join('|||');
+  
+  const combined = `${licenseText || ''}|||${invoiceText || ''}|||${policyContent}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(combined);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -342,6 +358,40 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Initialize Supabase client for cache operations
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Generate hash for cache lookup
+    const documentHash = await generateDocumentHash(licenseText, invoiceText, policyDocuments || []);
+    console.log("Document hash:", documentHash);
+
+    // Check cache first
+    const { data: cachedResult, error: cacheError } = await supabase
+      .from('analysis_cache')
+      .select('analysis_result, expires_at')
+      .eq('document_hash', documentHash)
+      .single();
+
+    if (cachedResult && !cacheError) {
+      const expiresAt = new Date(cachedResult.expires_at);
+      if (expiresAt > new Date()) {
+        console.log("Returning cached analysis result");
+        return new Response(JSON.stringify({ 
+          success: true, 
+          analysis: cachedResult.analysis_result,
+          cached: true
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
+        console.log("Cache expired, will regenerate");
+        // Delete expired cache entry
+        await supabase.from('analysis_cache').delete().eq('document_hash', documentHash);
+      }
+    }
+
     // Build policy context from all provided policy documents
     let policyContext = "";
     if (policyDocuments && policyDocuments.length > 0) {
@@ -405,7 +455,7 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.1,
+      temperature: 0,  // Set to 0 for deterministic/consistent results
       max_tokens: 32000,
       // Use tool-calling to force a valid JSON payload (much more reliable than free-form JSON text).
       tools: [
@@ -741,6 +791,28 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       hasLicenseSnapshot: !!analysisResult.licenseSnapshot,
       isComplete: analysisResult.analysisCompleteness?.isComplete,
     });
+
+    // Store result in cache for future requests
+    try {
+      const { error: insertError } = await supabase
+        .from('analysis_cache')
+        .upsert({
+          document_hash: documentHash,
+          analysis_result: analysisResult,
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+        }, {
+          onConflict: 'document_hash'
+        });
+      
+      if (insertError) {
+        console.error("Failed to cache analysis result:", insertError);
+      } else {
+        console.log("Analysis result cached successfully");
+      }
+    } catch (cacheStoreError) {
+      console.error("Error storing cache:", cacheStoreError);
+      // Don't fail the request if caching fails
+    }
 
     return new Response(JSON.stringify({ 
       success: true, 
