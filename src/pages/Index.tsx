@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { AppLayout } from "@/components/layout";
 import { 
   DocumentPreparationStep,
@@ -12,6 +12,7 @@ import DocumentUpload from "@/components/DocumentUpload";
 import { ReportGenerator } from "@/components/report/ReportGenerator";
 import { usePolicyDocuments } from "@/hooks/usePolicyDocuments";
 import { useWorkflowStatus } from "@/hooks/useWorkflowStatus";
+import { useAnalysisSessions, type AnalysisSession } from "@/hooks/useAnalysisSessions";
 import type { ConfidenceLevel } from "@/components/gamification";
 
 const Index = () => {
@@ -20,7 +21,17 @@ const Index = () => {
   const [selectedEvidenceItem, setSelectedEvidenceItem] = useState(0);
   
   const { data: policyDocuments = [], isLoading: policyLoading } = usePolicyDocuments();
-  const { status } = useWorkflowStatus();
+  const { status, reset } = useWorkflowStatus();
+  const { 
+    sessions, 
+    isLoading: sessionsLoading, 
+    currentSessionId,
+    setCurrentSessionId,
+    saveSession, 
+    deleteSession,
+    isDeleting,
+    isSaving
+  } = useAnalysisSessions();
 
   // Determine completed steps based on workflow status (now 5 steps)
   const completedSteps = useMemo(() => {
@@ -47,14 +58,49 @@ const Index = () => {
     return blocked;
   }, [status, currentStep]);
 
-  const handleAnalyze = (result: any) => {
+  // Handle analysis completion - save to database
+  const handleAnalyze = useCallback(async (result: any) => {
     setAnalysisData(result);
     setCurrentStep(2); // Move to Item Analysis after analysis
-  };
+    
+    // Save the session to database
+    try {
+      await saveSession({
+        analysisResult: result,
+        status: "complete",
+      });
+    } catch (error) {
+      console.error("Failed to save session:", error);
+    }
+  }, [saveSession]);
 
   const handleStepClick = (step: number) => {
     setCurrentStep(step);
   };
+
+  // Clear current analysis and start fresh
+  const handleClearAnalysis = useCallback(() => {
+    setAnalysisData(null);
+    setCurrentStep(1);
+    setCurrentSessionId(null);
+    reset();
+  }, [reset, setCurrentSessionId]);
+
+  // Load a previous session
+  const handleLoadSession = useCallback((session: AnalysisSession) => {
+    setAnalysisData(session.analysis_result);
+    setCurrentSessionId(session.id);
+    setCurrentStep(2); // Go to Item Analysis
+  }, [setCurrentSessionId]);
+
+  // Delete a session
+  const handleDeleteSession = useCallback(async (id: string) => {
+    await deleteSession(id);
+    // If we deleted the current session, clear analysis
+    if (id === currentSessionId) {
+      handleClearAnalysis();
+    }
+  }, [deleteSession, currentSessionId, handleClearAnalysis]);
 
   // Transform analysis data for step components
   const analysisItems = useMemo(() => {
@@ -136,6 +182,15 @@ const Index = () => {
             licenseUploaded={status.documentStatuses.some(d => d.type === "license" && d.status === "complete")}
             invoiceUploaded={status.documentStatuses.some(d => d.type === "invoice" && d.status === "complete")}
             isPolicyLoading={policyLoading}
+            hasActiveAnalysis={!!analysisData}
+            onClearAnalysis={handleClearAnalysis}
+            onViewResults={() => setCurrentStep(2)}
+            sessions={sessions}
+            sessionsLoading={sessionsLoading}
+            currentSessionId={currentSessionId}
+            onLoadSession={handleLoadSession}
+            onDeleteSession={handleDeleteSession}
+            isDeleting={isDeleting}
           >
             <PolicyLibrary />
             <DocumentUpload onAnalyze={handleAnalyze} />
