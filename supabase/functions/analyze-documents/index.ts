@@ -418,23 +418,50 @@ Never mark ❌ Not Eligible solely because item is "not listed".
 OUTPUT FORMAT (JSON - REQUIRED)
 ═══════════════════════════════════════════════════════════════════════════════
 
+🚨 CRITICAL: The "documents" array in documentComprehension is MANDATORY and must list EVERY document that was analyzed:
+- Each policy document from the library (with full details)
+- The investment license document
+- Each invoice document
+
+If the documents array is empty, the output is INVALID.
+
 {
   "documentComprehension": {
     "gateStatus": "PASSED | BLOCKED",
     "blockedReason": "reason if blocked, null otherwise",
     "documents": [
       {
-        "documentName": "name",
+        "documentName": "EXACT document name - Investment Proclamation No. 1180/2020, Directive No. 503/2021, Investment License, Commercial Invoice, etc.",
         "documentType": "Policy | License | Invoice | Annex | Supporting",
-        "issuingAuthority": "authority name if policy document",
+        "issuingAuthority": "e.g., Council of Ministers, AAIC, Ministry of Trade, etc. (required for Policy type)",
         "languagesDetected": ["English", "Amharic"],
         "pageCount": 0,
         "ocrConfidence": "High | Medium | Low",
-        "keySectionsDetected": ["articles", "annexes", "tables"],
+        "keySectionsDetected": ["articles", "annexes", "tables", "capital goods list"],
         "capitalGoodsListPresent": true,
-        "annexesDetected": ["Annex 1", "Annex 2"],
-        "articlesIndexed": [{"articleNumber": "1", "page": 1, "clauseSummary": "brief clause description"}],
+        "annexesDetected": ["Annex 1", "Annex 2", "Capital Goods List"],
+        "articlesIndexed": [{"articleNumber": "Article 1", "page": 1, "clauseSummary": "brief clause description"}],
         "unreadablePages": [],
+        "readStatus": "Complete | Partial | Failed"
+      },
+      {
+        "documentName": "Investment License - [License Number or Investor Name]",
+        "documentType": "License",
+        "issuingAuthority": "Addis Ababa Investment Commission",
+        "languagesDetected": ["English", "Amharic"],
+        "pageCount": 1,
+        "ocrConfidence": "High | Medium | Low",
+        "keySectionsDetected": ["licensed activity", "investor details", "validity"],
+        "readStatus": "Complete | Partial | Failed"
+      },
+      {
+        "documentName": "Commercial Invoice - [Invoice Number]",
+        "documentType": "Invoice",
+        "issuingAuthority": "Supplier name",
+        "languagesDetected": ["English", "Chinese"],
+        "pageCount": 1,
+        "ocrConfidence": "High | Medium | Low",
+        "keySectionsDetected": ["line items", "specifications", "quantities"],
         "readStatus": "Complete | Partial | Failed"
       }
     ],
