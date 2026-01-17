@@ -406,7 +406,7 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
         { role: "user", content: userPrompt },
       ],
       temperature: 0.1,
-      max_tokens: 24000,
+      max_tokens: 32000,
       // Use tool-calling to force a valid JSON payload (much more reliable than free-form JSON text).
       tools: [
         {
@@ -417,11 +417,68 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
             parameters: {
               type: "object",
               properties: {
-                documentComprehension: { type: "object" },
-                executiveSummary: { type: "object" },
-                licenseSnapshot: { type: "object" },
-                complianceItems: { type: "array", items: { type: "object" } },
-                analysisCompleteness: { type: "object" },
+                documentComprehension: { 
+                  type: "object",
+                  required: ["gateStatus"],
+                  properties: {
+                    gateStatus: { type: "string", enum: ["PASSED", "BLOCKED"] },
+                    blockedReason: { type: "string" },
+                    documents: { type: "array" },
+                    policyIndex: { type: "array" },
+                    licenseUnderstanding: { type: "object" },
+                    invoiceUnderstanding: { type: "object" },
+                    analysisPermissionStatement: { type: "string" }
+                  }
+                },
+                executiveSummary: { 
+                  type: "object",
+                  required: ["overallStatus", "topIssues"],
+                  properties: {
+                    overallStatus: { type: "string" },
+                    eligibleCount: { type: "number" },
+                    clarificationCount: { type: "number" },
+                    notEligibleCount: { type: "number" },
+                    topIssues: { type: "array", items: { type: "string" } },
+                    additionalInfoNeeded: { type: "array", items: { type: "string" } }
+                  }
+                },
+                licenseSnapshot: { 
+                  type: "object",
+                  required: ["licensedActivity"],
+                  properties: {
+                    licensedActivity: { type: "string" },
+                    sector: { type: "string" },
+                    scopeOfOperation: { type: "string" },
+                    restrictions: { type: "string" }
+                  }
+                },
+                complianceItems: { 
+                  type: "array", 
+                  minItems: 1,
+                  items: { 
+                    type: "object",
+                    required: ["itemNumber", "invoiceItem", "normalizedName", "eligibilityStatus", "licenseAlignment"],
+                    properties: {
+                      itemNumber: { type: "number" },
+                      invoiceItem: { type: "string" },
+                      normalizedName: { type: "string" },
+                      eligibilityStatus: { type: "string" },
+                      licenseAlignment: { type: "string" },
+                      citations: { type: "array" },
+                      reasoning: { type: "array" }
+                    }
+                  }
+                },
+                analysisCompleteness: { 
+                  type: "object",
+                  required: ["totalInvoiceItems", "analyzedItems", "isComplete"],
+                  properties: {
+                    totalInvoiceItems: { type: "number" },
+                    analyzedItems: { type: "number" },
+                    isComplete: { type: "boolean" },
+                    completenessNote: { type: "string" }
+                  }
+                },
                 officerActionsNeeded: { type: "array", items: { type: "object" } },
               },
               required: [
@@ -559,6 +616,43 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       };
     }
 
+    // Validate that the analysis actually contains meaningful data
+    const isEmptyAnalysis = (
+      !analysisResult.parseError &&
+      (!analysisResult.complianceItems || analysisResult.complianceItems.length === 0) &&
+      (!analysisResult.documentComprehension?.gateStatus || 
+       (analysisResult.documentComprehension?.gateStatus === "PASSED" && !analysisResult.executiveSummary?.overallStatus))
+    );
+
+    if (isEmptyAnalysis) {
+      console.error("AI returned empty analysis structure:", {
+        hasDocComprehension: !!analysisResult.documentComprehension,
+        gateStatus: analysisResult.documentComprehension?.gateStatus,
+        hasExecSummary: !!analysisResult.executiveSummary,
+        complianceItemsCount: analysisResult.complianceItems?.length || 0,
+        hasLicenseSnapshot: !!analysisResult.licenseSnapshot,
+      });
+      return new Response(JSON.stringify({ 
+        error: "Analysis failed to produce results. The AI may have run out of processing capacity. Try with: (1) fewer invoice items, (2) shorter policy documents, or (3) simpler documents.",
+        parseError: true,
+        parseErrorReason: "EMPTY_ANALYSIS_RESULT",
+        rawResponse: JSON.stringify(analysisResult)
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Log analysis summary for debugging
+    console.log("Analysis result summary:", {
+      hasDocComprehension: !!analysisResult.documentComprehension,
+      gateStatus: analysisResult.documentComprehension?.gateStatus,
+      hasExecSummary: !!analysisResult.executiveSummary,
+      overallStatus: analysisResult.executiveSummary?.overallStatus,
+      complianceItemsCount: analysisResult.complianceItems?.length || 0,
+      hasLicenseSnapshot: !!analysisResult.licenseSnapshot,
+      isComplete: analysisResult.analysisCompleteness?.isComplete,
+    });
 
     return new Response(JSON.stringify({ 
       success: true, 

@@ -308,6 +308,49 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const analysisCompleteness = data?.analysisCompleteness;
   const officerActionsNeeded = data?.officerActionsNeeded || [];
 
+  // Handle empty analysis results (AI returned structure but no actual data)
+  if (complianceItems.length === 0 && !documentComprehension?.blockedReason && documentComprehension?.gateStatus !== "BLOCKED") {
+    return (
+      <section className="py-16 bg-muted/20">
+        <div className="container">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-3">የትንተና ውጤቶች (Analysis Results)</h2>
+            <p className="text-muted-foreground">Analysis produced no results</p>
+          </div>
+
+          <Card className="max-w-4xl mx-auto border-warning border-l-4">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                <CardTitle className="text-lg">ባዶ ትንተና ውጤት (Empty Analysis)</CardTitle>
+              </div>
+              <CardDescription>
+                The AI analysis completed but returned no items. This usually means:
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+                <li>The invoice had no recognizable line items</li>
+                <li>The policy documents were too large for processing</li>
+                <li>The AI ran out of processing capacity</li>
+                <li>The documents could not be properly parsed</li>
+              </ul>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm font-medium mb-2">Suggested actions:</p>
+                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                  <li>Try re-uploading the documents</li>
+                  <li>Use simpler or shorter invoice files</li>
+                  <li>Ensure documents are clear and readable</li>
+                  <li>Contact support if the issue persists</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+    );
+  }
+
   // Calculate completeness metrics
   const totalInvoiceItems = analysisCompleteness?.totalInvoiceItems || 
     documentComprehension?.invoiceUnderstanding?.totalLineItems || 0;
