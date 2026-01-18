@@ -1,12 +1,14 @@
-import { FileSearch, BookOpen, Quote, ExternalLink, AlertCircle } from "lucide-react";
+import { FileSearch, BookOpen, Quote, ExternalLink, AlertCircle, ShieldAlert, Ban, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { ConfidenceBadge, type ConfidenceLevel } from "@/components/gamification";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Citation {
+  clause_id?: string;
   documentName: string;
   articleSection: string;
   pageNumber: number;
@@ -28,6 +30,9 @@ interface EvidenceItem {
   citations: Citation[];
   essentialityAnalysis?: EssentialityAnalysis;
   confidence: ConfidenceLevel;
+  clauseRetrievalBlocked?: boolean;
+  referencedClauseIds?: string[];
+  eligibilityStatus?: string;
 }
 
 interface EvidenceReviewStepProps {
@@ -39,14 +44,16 @@ interface EvidenceReviewStepProps {
 /**
  * Step 4 — Evidence Review (VISUAL PRIORITY)
  * 
+ * MANDATORY POLICY CLAUSE ENFORCEMENT:
+ * - Evidence panel must NEVER be empty
+ * - If no clause retrieved: show blocked state
+ * - If clause found: show full citation details
+ * 
  * When an item card is expanded:
  * - Evidence panel becomes dominant (≥50% width)
  * - Policy clauses are highlighted
  * - Page numbers shown
- * - Essentiality reasoning is step-by-step
- * - Confidence badge shown prominently
- * 
- * Rule: Evidence must visually outweigh conclusions.
+ * - Clause IDs shown prominently
  */
 const EvidenceReviewStep = ({
   evidenceItems,
@@ -54,6 +61,17 @@ const EvidenceReviewStep = ({
   onItemSelect,
 }: EvidenceReviewStepProps) => {
   const selectedItem = evidenceItems[selectedItemIndex] || evidenceItems[0];
+  
+  // Determine if item has valid clause binding
+  const hasValidClauseBinding = selectedItem && (
+    (selectedItem.referencedClauseIds && selectedItem.referencedClauseIds.length > 0) ||
+    (selectedItem.citations && selectedItem.citations.length > 0 && 
+     selectedItem.citations.some(c => c.clause_id || (c.pageNumber && c.pageNumber > 0)))
+  );
+  
+  const isBlocked = selectedItem?.clauseRetrievalBlocked || 
+    (selectedItem && !hasValidClauseBinding && 
+     selectedItem.eligibilityStatus?.includes("Deferred"));
 
   return (
     <div className="p-6 lg:p-8 h-full">
@@ -85,49 +103,104 @@ const EvidenceReviewStep = ({
           <CardContent className="p-0">
             <ScrollArea className="h-[calc(100vh-400px)]">
               <div className="p-2 space-y-1">
-                {evidenceItems.map((item, index) => (
-                  <button
-                    key={item.itemNumber}
-                    onClick={() => onItemSelect?.(index)}
-                    className={cn(
-                      "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors",
-                      "hover:bg-muted/50",
-                      selectedItemIndex === index && "bg-primary/10 border border-primary/20"
-                    )}
-                  >
-                    <div className="flex items-center justify-center w-6 h-6 rounded bg-muted text-xs font-semibold shrink-0">
-                      {item.itemNumber}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.itemName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.citations.length} ማስረጃዎች
-                      </p>
-                    </div>
-                    <ConfidenceBadge level={item.confidence} size="sm" showLabel={false} />
-                  </button>
-                ))}
+                {evidenceItems.map((item, index) => {
+                  const hasClauseBinding = (item.referencedClauseIds && item.referencedClauseIds.length > 0) ||
+                    (item.citations && item.citations.length > 0 && 
+                     item.citations.some(c => c.clause_id || (c.pageNumber && c.pageNumber > 0)));
+                  const itemBlocked = item.clauseRetrievalBlocked || 
+                    (!hasClauseBinding && item.eligibilityStatus?.includes("Deferred"));
+                  
+                  return (
+                    <button
+                      key={item.itemNumber}
+                      onClick={() => onItemSelect?.(index)}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors",
+                        "hover:bg-muted/50",
+                        selectedItemIndex === index && "bg-primary/10 border border-primary/20",
+                        itemBlocked && "border-l-2 border-l-destructive"
+                      )}
+                    >
+                      <div className={cn(
+                        "flex items-center justify-center w-6 h-6 rounded text-xs font-semibold shrink-0",
+                        itemBlocked ? "bg-destructive/10 text-destructive" : "bg-muted"
+                      )}>
+                        {itemBlocked ? <Ban className="h-3 w-3" /> : item.itemNumber}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.itemName}</p>
+                        <p className={cn(
+                          "text-xs",
+                          itemBlocked ? "text-destructive" : "text-muted-foreground"
+                        )}>
+                          {itemBlocked ? "ፖሊሲ አልተገኘም" : `${item.citations.length} ማስረጃዎች`}
+                        </p>
+                      </div>
+                      {itemBlocked ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                                <ShieldAlert className="h-3 w-3" />
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="left">
+                              <p className="text-sm">የፖሊሲ አንቀጽ አልተገኘም</p>
+                              <p className="text-xs text-muted-foreground">(No policy clause found)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <ConfidenceBadge level={item.confidence} size="sm" showLabel={false} />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </ScrollArea>
           </CardContent>
         </Card>
 
         {/* Right: Evidence Panel (DOMINANT - ≥50% width) */}
-        <Card className="h-full overflow-hidden">
-          <CardHeader className="pb-3 border-b">
+        <Card className={cn(
+          "h-full overflow-hidden",
+          isBlocked && "border-2 border-destructive"
+        )}>
+          <CardHeader className={cn(
+            "pb-3 border-b",
+            isBlocked && "bg-destructive/5"
+          )}>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
+                <CardTitle className={cn(
+                  "text-lg flex items-center gap-2",
+                  isBlocked && "text-destructive"
+                )}>
+                  {isBlocked ? (
+                    <ShieldAlert className="h-5 w-5 text-destructive" />
+                  ) : (
+                    <BookOpen className="h-5 w-5 text-primary" />
+                  )}
                   {selectedItem?.itemName || "ዕቃ ይምረጡ"}
                 </CardTitle>
                 <CardDescription>
-                  ማስረጃዎች እና ጥቅሶች (Evidence and Citations)
+                  {isBlocked 
+                    ? "የፖሊሲ አንቀጽ አልተገኘም (No Policy Clause Retrieved)"
+                    : "ማስረጃዎች እና ጥቅሶች (Evidence and Citations)"
+                  }
                 </CardDescription>
               </div>
-              {selectedItem && (
-                <ConfidenceBadge level={selectedItem.confidence} size="md" />
-              )}
+              <div className="flex items-center gap-2">
+                {isBlocked && (
+                  <Badge variant="destructive" className="gap-1">
+                    <Ban className="h-3 w-3" />
+                    Blocked
+                  </Badge>
+                )}
+                {selectedItem && !isBlocked && (
+                  <ConfidenceBadge level={selectedItem.confidence} size="md" />
+                )}
+              </div>
             </div>
           </CardHeader>
 
@@ -149,7 +222,56 @@ const EvidenceReviewStep = ({
                         ፖሊሲ ጥቅሶች (Policy Citations)
                       </h4>
 
-                      {selectedItem.citations.length === 0 ? (
+                      {isBlocked ? (
+                        /* ═══════════════════════════════════════════════════════════════
+                           CASE B: CLAUSE NOT FOUND — BLOCKED STATE (MANDATORY DISPLAY)
+                           ═══════════════════════════════════════════════════════════════ */
+                        <div className="space-y-4">
+                          <div className="p-6 rounded-lg bg-destructive/10 border-2 border-destructive flex flex-col items-center justify-center text-center">
+                            <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
+                            <h4 className="text-lg font-bold text-destructive mb-2">
+                              🚫 ተፈጻሚ የሚሆን የፖሊሲ አንቀጽ አልተገኘም
+                            </h4>
+                            <p className="text-sm text-destructive/80 mb-4">
+                              No Applicable Policy Clause Retrieved
+                            </p>
+                            <div className="w-full p-4 bg-background/50 rounded border border-destructive/20 text-left">
+                              <p className="text-sm text-muted-foreground mb-2">
+                                <strong>ይህ ዕቃ የሚከተለው እስካልተገኘ ድረስ ሊገመገም አይችልም:</strong>
+                              </p>
+                              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                                <li>ተዛማጅ የፖሊሲ አንቀጽ (Relevant policy article)</li>
+                                <li>ገጽ ቁጥር (Page number)</li>
+                                <li>የአንቀጽ ጽሁፍ (Clause text)</li>
+                              </ul>
+                            </div>
+                          </div>
+
+                          <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
+                            <div className="flex items-start gap-3">
+                              <Info className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-sm font-medium text-warning">
+                                  የአስተዳዳሪ ትኩረት ያስፈልጋል
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Admin Attention Required: A relevant policy clause must be indexed
+                                  in the Policy Library before this item can be evaluated.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded bg-muted/50 border">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">
+                              የውሳኔ ሁኔታ (Decision Status)
+                            </p>
+                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
+                              ⚠️ Decision Deferred — Policy Clause Not Found
+                            </Badge>
+                          </div>
+                        </div>
+                      ) : selectedItem.citations.length === 0 ? (
                         <div className="p-4 rounded-lg bg-warning/10 border border-warning/20 flex items-start gap-3">
                           <AlertCircle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
                           <div>
@@ -168,9 +290,14 @@ const EvidenceReviewStep = ({
                               key={i}
                               className="p-4 rounded-lg border bg-card hover:shadow-soft transition-shadow"
                             >
-                              {/* Citation header */}
+                              {/* Citation header with clause_id */}
                               <div className="flex items-start justify-between gap-4 mb-3">
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {citation.clause_id && (
+                                    <Badge variant="default" className="text-xs bg-primary/90">
+                                      🔗 {citation.clause_id}
+                                    </Badge>
+                                  )}
                                   <Badge variant="secondary" className="text-xs">
                                     📘 {citation.documentName}
                                   </Badge>
