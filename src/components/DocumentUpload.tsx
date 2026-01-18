@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useWorkflowStatus } from "@/hooks/useWorkflowStatus";
+import { useDecisionTrace, createTraceEvent, createEngagementSignal } from "@/hooks/useDecisionTrace";
 
 interface UploadZone {
   id: string;
@@ -66,6 +67,13 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
     updateDocumentStatus,
     setCaseFilesReady,
   } = useWorkflowStatus();
+
+  const {
+    addEvent,
+    addEngagementSignal,
+    setAnalyzing,
+    clear: clearTrace,
+  } = useDecisionTrace();
 
   // Update case files ready status when both files are uploaded
   useEffect(() => {
@@ -251,18 +259,31 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
         "Policy/Case ingestion incomplete",
         "Complete Policy Import phase first — add policy documents to the library"
       );
+      addEvent(createTraceEvent.blocked(
+        undefined,
+        "Policy Library not ready",
+        "Add policy documents to the library first"
+      ));
       toast.error("Policy Library is empty. Please add policy documents first.");
       return;
     }
 
+    // Clear previous trace and start new analysis
+    clearTrace();
     setIsAnalyzing(true);
+    setAnalyzing(true);
     startAnalysis();
 
     try {
       const licenseZone = uploadZones.find(z => z.id === "license");
       const invoiceZone = uploadZones.find(z => z.id === "invoice");
 
+      // Trace: Document ingestion
+      addEvent(createTraceEvent.documentIngestion(licenseZone?.file?.name || "License", "started"));
+      addEvent(createTraceEvent.documentIngestion(invoiceZone?.file?.name || "Invoice", "complete"));
+
       updateAnalysisStage("ITEM_NORMALIZATION");
+      addEvent(createTraceEvent.info("Starting item normalization..."));
 
       // Prepare policy documents for the AI
       const policyDocsForAI = policyDocuments?.map(doc => ({
@@ -279,12 +300,19 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
           "Policy Library empty",
           "Admin must upload policy documents before analysis can proceed"
         );
+        addEvent(createTraceEvent.blocked(
+          undefined,
+          "No policy documents in library",
+          "Admin must upload policy documents"
+        ));
         toast.error("No policy documents in library. Please add policy documents first.");
         setIsAnalyzing(false);
+        setAnalyzing(false);
         return;
       }
 
       updateAnalysisStage("LIST_MATCHING");
+      addEvent(createTraceEvent.info("Querying PolicyClauseIndex for matching clauses..."));
 
       // Call the edge function
       const { data, error } = await supabase.functions.invoke("analyze-documents", {
@@ -298,27 +326,36 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
       if (error) {
         console.error("Analysis error:", error);
         errorAnalysis(error.message || "Failed to analyze documents");
+        addEvent(createTraceEvent.error(error.message || "Failed to analyze documents"));
         toast.error(error.message || "Failed to analyze documents");
+        setAnalyzing(false);
         return;
       }
 
       if (data?.error) {
         errorAnalysis(data.error);
+        addEvent(createTraceEvent.error(data.error));
         toast.error(data.error);
+        setAnalyzing(false);
         return;
       }
 
       updateAnalysisStage("LICENSE_ALIGNMENT_CHECK");
+      addEvent(createTraceEvent.info("Checking license alignment for each item..."));
 
       // Small delay to show progress
       await new Promise(resolve => setTimeout(resolve, 300));
       
       updateAnalysisStage("ESSENTIALITY_EVALUATION");
+      addEvent(createTraceEvent.info("Evaluating essentiality requirements..."));
       
       await new Promise(resolve => setTimeout(resolve, 300));
 
       if (data?.success && data?.analysis) {
         updateAnalysisStage("DECISION_TABLE_AND_CITATIONS_OUTPUT");
+        
+        // Process trace events from analysis result
+        processAnalysisTrace(data.analysis);
         
         // Check if analysis was blocked due to document comprehension issues
         if (data.analysis.documentComprehension?.gateStatus === "BLOCKED") {
@@ -326,22 +363,133 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
             data.analysis.documentComprehension.blockedReason || "Document ingestion incomplete",
             "Review blocked documents and provide missing information"
           );
+          addEvent(createTraceEvent.blocked(
+            undefined,
+            data.analysis.documentComprehension.blockedReason || "Document ingestion incomplete",
+            "Review blocked documents"
+          ));
         } else {
           completeAnalysis();
+          addEvent(createTraceEvent.success("Analysis complete — all items processed"));
+          addEngagementSignal(createEngagementSignal.readyForReport());
         }
         
         toast.success("Analysis complete!");
         onAnalyze(data.analysis);
       } else {
         errorAnalysis("Unexpected response from analysis");
+        addEvent(createTraceEvent.error("Unexpected response from analysis"));
         toast.error("Unexpected response from analysis");
       }
     } catch (error) {
       console.error("Analysis error:", error);
       errorAnalysis("An error occurred during analysis");
+      addEvent(createTraceEvent.error("An error occurred during analysis"));
       toast.error("An error occurred during analysis");
     } finally {
       setIsAnalyzing(false);
+      setAnalyzing(false);
+    }
+  };
+
+  // Process analysis result and emit trace events
+  const processAnalysisTrace = (analysis: any) => {
+    if (!analysis?.complianceItems) return;
+
+    const items = analysis.complianceItems;
+    let totalClauses = 0;
+    let blockedItems = 0;
+
+    // Trace: Invoice preservation
+    addEvent(createTraceEvent.invoicePreservation(items.length));
+
+    items.forEach((item: any, index: number) => {
+      const itemNumber = item.itemNumber || index + 1;
+
+      // Trace: Normalization
+      if (item.normalizedName && item.invoiceItem) {
+        addEvent(createTraceEvent.normalization(
+          itemNumber,
+          item.invoiceItem,
+          item.normalizedName
+        ));
+      }
+
+      // Trace: Clause retrieval
+      const clauseIds = item.referencedClauseIds || item.citations?.map((c: any) => c.clauseId).filter(Boolean) || [];
+      const keywords = item.matchKeywords || [item.normalizedName?.split(" ")[0] || "item"].slice(0, 3);
+      
+      addEvent(createTraceEvent.clauseRetrieval(
+        itemNumber,
+        keywords,
+        clauseIds.length,
+        clauseIds
+      ));
+
+      // Trace: Clause binding (if clauses found)
+      if (clauseIds.length > 0 && item.citations?.length > 0) {
+        const citation = item.citations[0];
+        addEvent(createTraceEvent.clauseBinding(
+          itemNumber,
+          clauseIds[0] || citation.clauseId || "UNKNOWN",
+          citation.documentName || "Policy Document",
+          citation.pageNumber || 1
+        ));
+        totalClauses += clauseIds.length;
+      }
+
+      // Trace: Decision path
+      const decisionPath = item.matchResult === "Exact" ? "exact" :
+                          item.matchResult === "Mapped" ? "mapped" :
+                          item.essentialityAnalysis ? "essentiality" : "deferred";
+      
+      addEvent(createTraceEvent.decisionPath(itemNumber, decisionPath));
+
+      // Trace: License alignment
+      if (item.licenseAlignment) {
+        addEvent(createTraceEvent.licenseAlignment(
+          itemNumber,
+          item.licenseScope || "Licensed Investment Activity",
+          item.licenseAlignment === "Aligned"
+        ));
+      }
+
+      // Trace: Essentiality check
+      if (item.essentialityAnalysis) {
+        addEvent(createTraceEvent.essentialityCheck(
+          itemNumber,
+          item.essentialityAnalysis.isEssential ? "passed" : "pending"
+        ));
+      }
+
+      // Trace: Decision output
+      const decision = item.eligibilityStatus || "Pending";
+      const isBlocked = item.clauseRetrievalBlocked || decision.includes("Deferred");
+      
+      if (isBlocked) {
+        blockedItems++;
+        addEvent(createTraceEvent.blocked(
+          itemNumber,
+          "No applicable policy clause retrieved from PolicyClauseIndex",
+          "Admin must index relevant clauses or officer must request policy update"
+        ));
+      } else {
+        addEvent(createTraceEvent.decisionOutput(
+          itemNumber,
+          decision,
+          clauseIds.length
+        ));
+      }
+    });
+
+    // Engagement signals
+    if (totalClauses > 0) {
+      addEngagementSignal(createEngagementSignal.evidenceCollected(totalClauses));
+    }
+    if (blockedItems === 0 && items.length > 0) {
+      addEngagementSignal(createEngagementSignal.citationsComplete());
+    } else if (blockedItems > 0) {
+      addEngagementSignal(createEngagementSignal.awaitingClarification());
     }
   };
 

@@ -151,6 +151,20 @@
   .shadow-elevated {
     box-shadow: var(--shadow-elevated);
   }
+
+  /* Decision Trace animations */
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-subtle {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.85;
+    }
+  }
 }
 
 /* Print Styles for Decision Report */
