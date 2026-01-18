@@ -622,16 +622,110 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Initialize Supabase client for cache operations
+    // Initialize Supabase client for cache and policy clause operations
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Generate hash for cache lookup
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // STEP 1: MANDATORY POLICY CLAUSE RETRIEVAL FROM DATABASE
+    // ═══════════════════════════════════════════════════════════════════════════════
+    console.log("Step 1: Retrieving policy clauses from database...");
+    
+    const { data: policyClauses, error: clauseError } = await supabase
+      .from('policy_clauses')
+      .select('*')
+      .eq('is_verified', true)
+      .order('created_at', { ascending: false });
+
+    if (clauseError) {
+      console.error("Failed to retrieve policy clauses:", clauseError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Failed to retrieve policy clauses from database. Admin action required.",
+        code: "POLICY_CLAUSE_RETRIEVAL_FAILED",
+        clauseRetrievalBlocked: true
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const totalClauses = policyClauses?.length || 0;
+    console.log(`Retrieved ${totalClauses} verified policy clauses from database`);
+
+    // Check if we have minimum required clauses
+    if (totalClauses === 0) {
+      console.warn("No policy clauses found in database - analysis will be blocked");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "No policy clauses indexed in database. Admin must populate the Policy Clause Index before analysis can proceed.",
+        code: "NO_POLICY_CLAUSES_INDEXED",
+        clauseRetrievalBlocked: true,
+        policyClauseIndexSummary: {
+          totalClausesIndexed: 0,
+          clauseIdsAvailable: [],
+          capitalGoodsClauses: 0,
+          essentialityClauses: 0,
+          exclusionClauses: 0,
+          generalIncentiveClauses: 0,
+          isComplete: false,
+          missingClauseTypes: ["capital_goods", "essentiality", "general_incentive"]
+        }
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Categorize retrieved clauses
+    const clausesByType = {
+      capital_goods: policyClauses.filter((c: any) => c.applies_to?.includes('capital_goods')) || [],
+      essentiality: policyClauses.filter((c: any) => c.applies_to?.includes('essentiality')) || [],
+      exclusion: policyClauses.filter((c: any) => c.applies_to?.includes('exclusion')) || [],
+      general_incentive: policyClauses.filter((c: any) => c.applies_to?.includes('general_incentive')) || [],
+      customs_duty: policyClauses.filter((c: any) => c.applies_to?.includes('customs_duty')) || [],
+      income_tax: policyClauses.filter((c: any) => c.applies_to?.includes('income_tax')) || [],
+    };
+
+    const policyClauseIndexSummary = {
+      totalClausesIndexed: totalClauses,
+      clauseIdsAvailable: policyClauses.map((c: any) => c.clause_id),
+      capitalGoodsClauses: clausesByType.capital_goods.length,
+      essentialityClauses: clausesByType.essentiality.length,
+      exclusionClauses: clausesByType.exclusion.length,
+      generalIncentiveClauses: clausesByType.general_incentive.length,
+      isComplete: clausesByType.capital_goods.length > 0 || clausesByType.general_incentive.length > 0,
+      missingClauseTypes: [] as string[]
+    };
+
+    // Identify missing clause types
+    if (clausesByType.capital_goods.length === 0 && clausesByType.general_incentive.length === 0) {
+      policyClauseIndexSummary.missingClauseTypes.push("capital_goods", "general_incentive");
+    }
+
+    console.log("Policy Clause Index Summary:", policyClauseIndexSummary);
+
+    // Build policy clause context for AI (formatted for matching)
+    const policyClauseContext = policyClauses.map((clause: any) => {
+      return `
+CLAUSE_ID: ${clause.clause_id}
+DOCUMENT: ${clause.policy_document_name}
+SECTION: ${clause.section_type} ${clause.section_number}
+PAGE: ${clause.page_number}
+HEADING: ${clause.clause_heading}${clause.clause_heading_amharic ? ` / ${clause.clause_heading_amharic}` : ''}
+TEXT: ${clause.clause_text}${clause.clause_text_amharic ? `\nTEXT_AMHARIC: ${clause.clause_text_amharic}` : ''}
+KEYWORDS: ${(clause.keywords || []).join(', ')}
+APPLIES_TO: ${(clause.applies_to || []).join(', ')}
+INCLUSION_TYPE: ${clause.inclusion_type}
+${clause.notes ? `NOTES: ${clause.notes}` : ''}
+---`;
+    }).join('\n');
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // STEP 2: CACHE CHECK (after clause retrieval)
+    // ═══════════════════════════════════════════════════════════════════════════════
     const documentHash = await generateDocumentHash(licenseText, invoiceText, policyDocuments || []);
     console.log("Document hash:", documentHash);
 
-    // Check cache first
     const { data: cachedResult, error: cacheError } = await supabase
       .from('analysis_cache')
       .select('analysis_result, expires_at')
@@ -641,22 +735,30 @@ serve(async (req) => {
     if (cachedResult && !cacheError) {
       const expiresAt = new Date(cachedResult.expires_at);
       if (expiresAt > new Date()) {
-        console.log("Returning cached analysis result");
+        console.log("Returning cached analysis result (with fresh clause index)");
+        // Inject fresh clause index into cached result
+        const enhancedResult = {
+          ...cachedResult.analysis_result,
+          policyClauseIndex: policyClauses,
+          policyClauseIndexSummary
+        };
         return new Response(JSON.stringify({ 
           success: true, 
-          analysis: cachedResult.analysis_result,
-          cached: true
+          analysis: enhancedResult,
+          cached: true,
+          clausesRetrieved: totalClauses
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } else {
         console.log("Cache expired, will regenerate");
-        // Delete expired cache entry
         await supabase.from('analysis_cache').delete().eq('document_hash', documentHash);
       }
     }
 
-    // Build policy context from all provided policy documents
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // STEP 3: BUILD POLICY CONTEXT
+    // ═══════════════════════════════════════════════════════════════════════════════
     let policyContext = "";
     if (policyDocuments && policyDocuments.length > 0) {
       policyContext = policyDocuments.map((doc: any, index: number) => {
@@ -672,7 +774,7 @@ ${doc.content_markdown || doc.content_text || "No content available"}
 `;
       }).join("\n\n");
     } else {
-      policyContext = "NO POLICY DOCUMENTS PROVIDED - Cannot perform compliance analysis without policy library.";
+      policyContext = "NO POLICY DOCUMENTS PROVIDED - Using Policy Clause Index as primary source.";
     }
 
     // Pre-count invoice items to enforce completeness
@@ -681,7 +783,26 @@ ${doc.content_markdown || doc.content_text || "No content available"}
     const estimatedItemCount = invoiceMatches?.length || 0;
 
     const userPrompt = `
-POLICY LIBRARY (Source of Truth):
+═══════════════════════════════════════════════════════════════════════════════
+🔒 MANDATORY POLICY CLAUSE INDEX (RETRIEVED FROM DATABASE - ${totalClauses} CLAUSES)
+═══════════════════════════════════════════════════════════════════════════════
+
+You MUST use ONLY these pre-indexed clauses for all citations. 
+Each clause has a unique CLAUSE_ID that MUST be referenced.
+
+${policyClauseContext}
+
+═══════════════════════════════════════════════════════════════════════════════
+POLICY CLAUSE INDEX SUMMARY:
+- Total Clauses: ${policyClauseIndexSummary.totalClausesIndexed}
+- Capital Goods Clauses: ${policyClauseIndexSummary.capitalGoodsClauses}
+- Essentiality Clauses: ${policyClauseIndexSummary.essentialityClauses}
+- Exclusion Clauses: ${policyClauseIndexSummary.exclusionClauses}
+- General Incentive Clauses: ${policyClauseIndexSummary.generalIncentiveClauses}
+- Clause IDs Available: ${policyClauseIndexSummary.clauseIdsAvailable.join(', ')}
+═══════════════════════════════════════════════════════════════════════════════
+
+POLICY LIBRARY (Reference Only - Use Clause Index for Citations):
 ${policyContext}
 
 INVESTMENT LICENSE:
@@ -689,6 +810,37 @@ ${licenseText || "No license document provided"}
 
 COMMERCIAL INVOICE(S):
 ${invoiceText || "No invoice document provided"}
+
+═══════════════════════════════════════════════════════════════════════════════
+🚨 MANDATORY CLAUSE BINDING RULE (NON-NEGOTIABLE)
+═══════════════════════════════════════════════════════════════════════════════
+
+For EVERY invoice item, you MUST:
+
+1. SEARCH the Policy Clause Index above for matching clauses
+2. BIND at least one clause_id to the item (use referencedClauseIds array)
+3. DISPLAY the bound clause in citations with:
+   - clause_id (REQUIRED - from the index above)
+   - documentName (from DOCUMENT field)
+   - articleSection (from SECTION field)
+   - pageNumber (from PAGE field)
+   - quote (from TEXT field)
+   - relevance (why this clause applies)
+
+4. If NO clause can be found:
+   - Set eligibilityStatus = "Decision Deferred — Policy Clause Not Found"
+   - Set referencedClauseIds = []
+   - Add to officerActionsNeeded with type = "policy-clause-not-found"
+   - DO NOT reason or assign eligibility
+
+5. ONLY after clause binding may you reason and assign status
+
+MATCHING STRATEGY (in order):
+1. Exact keyword match (from clause KEYWORDS field)
+2. Semantic similarity (between item name and clause TEXT)
+3. Category match (APPLIES_TO: capital_goods, essentiality, etc.)
+4. Fallback to general_incentive clauses
+5. If all fail → "Decision Deferred — Policy Clause Not Found"
 
 ═══════════════════════════════════════════════════════════════════════════════
 ⚠️ CRITICAL COMPLETENESS REQUIREMENT ⚠️
@@ -699,16 +851,15 @@ You MUST:
 1. Count the EXACT number of line items in the invoice
 2. Set invoiceUnderstanding.totalLineItems to this exact count
 3. Produce EXACTLY that many entries in complianceItems array
-4. Verify complianceItems.length === totalLineItems before responding
-5. Set analysisCompleteness.isComplete = true ONLY if all items are analyzed
+4. Each item MUST have referencedClauseIds (even if empty for deferred items)
+5. Verify complianceItems.length === totalLineItems before responding
 
 DO NOT skip, group, or omit any items. Each invoice line = one complianceItems entry.
 ═══════════════════════════════════════════════════════════════════════════════
 
-Please analyze ALL invoice items against the investment license and policy documents. 
-First complete the mandatory Document Comprehension Phase, then proceed to policy-based compliance analysis only if the gate is passed.
-Provide your analysis in the specified JSON format with traceable citations for every compliance determination.
-REMEMBER: Every single invoice item must appear in your complianceItems array.
+Please analyze ALL invoice items against the investment license and policy clauses.
+For each item, first retrieve applicable clauses, then bind them, then reason.
+Provide your analysis in the specified JSON format with traceable clause_id references.
 `;
 
     console.log("Calling AI gateway...");
@@ -1078,6 +1229,55 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       );
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // STEP 5: INJECT POLICY CLAUSE INDEX INTO RESULT
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    // Inject the retrieved policy clauses into the analysis result
+    analysisResult.policyClauseIndex = policyClauses;
+    analysisResult.policyClauseIndexSummary = policyClauseIndexSummary;
+    
+    // Also inject into documentComprehension if it exists
+    if (analysisResult.documentComprehension) {
+      analysisResult.documentComprehension.policyClauseIndex = policyClauses;
+      analysisResult.documentComprehension.policyClauseIndexSummary = policyClauseIndexSummary;
+    }
+
+    // Validate clause binding for each compliance item
+    let itemsWithClauseBound = 0;
+    let itemsWithoutClause = 0;
+    const itemsNeedingClauses: number[] = [];
+
+    if (analysisResult.complianceItems && Array.isArray(analysisResult.complianceItems)) {
+      for (const item of analysisResult.complianceItems) {
+        const hasClauseBinding = item.referencedClauseIds && item.referencedClauseIds.length > 0;
+        const hasCitations = item.citations && item.citations.length > 0 && 
+          item.citations.some((c: any) => c.clause_id || c.pageNumber > 0);
+        
+        if (hasClauseBinding || hasCitations) {
+          itemsWithClauseBound++;
+        } else {
+          itemsWithoutClause++;
+          itemsNeedingClauses.push(item.itemNumber);
+          
+          // Enforce blocked state for items without clauses
+          if (item.eligibilityStatus && 
+              !item.eligibilityStatus.includes("Deferred") && 
+              !item.eligibilityStatus.includes("Policy Gap")) {
+            // Override eligibility - cannot have a decision without clause binding
+            item.eligibilityStatus = "Decision Deferred — Policy Clause Not Found";
+            item.clauseRetrievalBlocked = true;
+          }
+        }
+      }
+    }
+
+    // Update analysis completeness with clause binding stats
+    if (analysisResult.analysisCompleteness) {
+      analysisResult.analysisCompleteness.itemsWithValidCitations = itemsWithClauseBound;
+      analysisResult.analysisCompleteness.itemsDeferredForCitations = itemsWithoutClause;
+    }
+
     // Log analysis summary for debugging
     console.log("Analysis result summary:", {
       hasDocComprehension: !!analysisResult.documentComprehension,
@@ -1087,6 +1287,9 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
       complianceItemsCount: analysisResult.complianceItems?.length || 0,
       hasLicenseSnapshot: !!analysisResult.licenseSnapshot,
       isComplete: analysisResult.analysisCompleteness?.isComplete,
+      policyClausesRetrieved: totalClauses,
+      itemsWithClauseBound,
+      itemsWithoutClause,
     });
 
     // Store result in cache for future requests
@@ -1113,7 +1316,13 @@ REMEMBER: Every single invoice item must appear in your complianceItems array.
 
     return new Response(JSON.stringify({ 
       success: true, 
-      analysis: analysisResult 
+      analysis: analysisResult,
+      clausesRetrieved: totalClauses,
+      clauseBindingStats: {
+        itemsWithClauseBound,
+        itemsWithoutClause,
+        itemsNeedingClauses
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
