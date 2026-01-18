@@ -1,6 +1,8 @@
 import { ReactNode } from "react";
 import Header from "@/components/Header";
 import ProcessNavigator from "@/components/layout/ProcessNavigator";
+import { DecisionTracePanel } from "@/components/trace";
+import { useDecisionTrace } from "@/hooks/useDecisionTrace";
 import { cn } from "@/lib/utils";
 
 interface AppLayoutProps {
@@ -17,6 +19,7 @@ interface AppLayoutProps {
  * A. Top Bar (Persistent) - AAIC branding, navigation, officer profile
  * B. Left Vertical Flow Navigator - Process steps with sequential unlocking
  * C. Main Content Area - Step-specific content
+ * D. Right Decision Trace Panel - Real-time analysis trace (collapsible)
  */
 const AppLayout = ({
   children,
@@ -26,12 +29,17 @@ const AppLayout = ({
   onStepClick,
   className,
 }: AppLayoutProps) => {
+  const { isAnalyzing, events, isPanelOpen } = useDecisionTrace();
+
+  // Show trace panel when analyzing or when there are events
+  const showTracePanel = isAnalyzing || events.length > 0;
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* A. Top Bar (Persistent) */}
       <Header />
 
-      {/* Main Layout: Navigator + Content */}
+      {/* Main Layout: Navigator + Content + Trace */}
       <div className="flex-1 flex">
         {/* B. Left Vertical Flow Navigator */}
         <aside className="hidden lg:flex w-64 shrink-0 border-r border-border bg-card">
@@ -47,7 +55,24 @@ const AppLayout = ({
         <main className={cn("flex-1 overflow-auto", className)}>
           {children}
         </main>
+
+        {/* D. Right Decision Trace Panel */}
+        {showTracePanel && (
+          <aside className={cn(
+            "hidden lg:flex shrink-0 transition-all duration-300",
+            isPanelOpen ? "w-80" : "w-0"
+          )}>
+            <DecisionTracePanel />
+          </aside>
+        )}
       </div>
+
+      {/* Floating trace toggle for mobile / when collapsed */}
+      {showTracePanel && !isPanelOpen && (
+        <div className="lg:hidden">
+          <DecisionTracePanel />
+        </div>
+      )}
     </div>
   );
 };
