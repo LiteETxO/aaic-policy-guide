@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 /**
  * Error classification for resilient analysis handling.
@@ -17,14 +16,14 @@ export interface ClassifiedError {
   messageAmharic: string;
   isRetryable: boolean;
   stage: string;
-  timestamp: Date;
+  timestamp: number; // Use number instead of Date for serialization
   technicalDetails?: string;
 }
 
 export interface AnalysisCheckpoint {
   id: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: number; // Use number instead of Date for serialization
+  updatedAt: number;
   
   // Document state (expensive operations - don't repeat)
   documentsParseComplete: boolean;
@@ -57,7 +56,7 @@ export interface AnalysisCheckpoint {
   // AI gateway state
   lastAICallStage?: string;
   aiCallAttempts: number;
-  lastAICallTimestamp?: Date;
+  lastAICallTimestamp?: number;
   
   // Policy documents (for regenerating context)
   policyDocumentIds?: string[];
@@ -68,7 +67,7 @@ export interface NetworkRetryState {
   error?: ClassifiedError;
   retryCount: number;
   maxRetries: number;
-  lastRetryAt?: Date;
+  lastRetryAt?: number;
   canAutoRetry: boolean;
   technicalLog: string[];
 }
@@ -129,7 +128,7 @@ export function classifyError(error: any, stage: string): ClassifiedError {
       messageAmharic: "የአይ ኔትዎርክ ግንኙነት ተቋርጧል",
       isRetryable: true,
       stage,
-      timestamp: new Date(),
+      timestamp: Date.now(),
       technicalDetails: `Error: ${errorMessage}. Stage: ${stage}.`,
     };
   }
@@ -153,7 +152,7 @@ export function classifyError(error: any, stage: string): ClassifiedError {
       messageAmharic: "የሰነድ ማስኬጃ ስህተት",
       isRetryable: false,
       stage,
-      timestamp: new Date(),
+      timestamp: Date.now(),
       technicalDetails: errorMessage,
     };
   }
@@ -176,7 +175,7 @@ export function classifyError(error: any, stage: string): ClassifiedError {
       messageAmharic: "የፖሊሲ አንቀጽ ማስኬጃ ችግር",
       isRetryable: false,
       stage,
-      timestamp: new Date(),
+      timestamp: Date.now(),
       technicalDetails: errorMessage,
     };
   }
@@ -189,7 +188,7 @@ export function classifyError(error: any, stage: string): ClassifiedError {
     messageAmharic: "ያልተጠበቀ ስህተት ተከስቷል",
     isRetryable: true,
     stage,
-    timestamp: new Date(),
+    timestamp: Date.now(),
     technicalDetails: errorMessage,
   };
 }
@@ -203,41 +202,40 @@ const initialNetworkRetryState: NetworkRetryState = {
 };
 
 export const useAnalysisCheckpoint = create<AnalysisCheckpointStore>()(
-  persist(
-    (set, get) => ({
-      checkpoint: null,
-      networkRetryState: initialNetworkRetryState,
+  (set, get) => ({
+    checkpoint: null,
+    networkRetryState: initialNetworkRetryState,
+    
+    createCheckpoint: () => {
+      const id = generateCheckpointId();
+      set({
+        checkpoint: {
+          id,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          documentsParseComplete: false,
+          ocrComplete: false,
+          invoiceItemsExtracted: false,
+          clausesRetrieved: false,
+          analysisStarted: false,
+          analysisComplete: false,
+          aiCallAttempts: 0,
+        },
+      });
+    },
       
-      createCheckpoint: () => {
-        const id = generateCheckpointId();
+    updateCheckpoint: (updates) => {
+      const current = get().checkpoint;
+      if (current) {
         set({
           checkpoint: {
-            id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            documentsParseComplete: false,
-            ocrComplete: false,
-            invoiceItemsExtracted: false,
-            clausesRetrieved: false,
-            analysisStarted: false,
-            analysisComplete: false,
-            aiCallAttempts: 0,
+            ...current,
+            ...updates,
+            updatedAt: Date.now(),
           },
         });
-      },
-      
-      updateCheckpoint: (updates) => {
-        const current = get().checkpoint;
-        if (current) {
-          set({
-            checkpoint: {
-              ...current,
-              ...updates,
-              updatedAt: new Date(),
-            },
-          });
-        }
-      },
+      }
+    },
       
       clearCheckpoint: () => {
         set({
@@ -275,29 +273,29 @@ export const useAnalysisCheckpoint = create<AnalysisCheckpointStore>()(
         });
       },
       
-      incrementRetry: () => {
-        const currentState = get().networkRetryState;
-        const checkpoint = get().checkpoint;
-        
+    incrementRetry: () => {
+      const currentState = get().networkRetryState;
+      const checkpoint = get().checkpoint;
+      
+      set({
+        networkRetryState: {
+          ...currentState,
+          retryCount: currentState.retryCount + 1,
+          lastRetryAt: Date.now(),
+          canAutoRetry: currentState.retryCount + 1 < 1, // Only 1 auto retry
+        },
+      });
+      
+      if (checkpoint) {
         set({
-          networkRetryState: {
-            ...currentState,
-            retryCount: currentState.retryCount + 1,
-            lastRetryAt: new Date(),
-            canAutoRetry: currentState.retryCount + 1 < 1, // Only 1 auto retry
+          checkpoint: {
+            ...checkpoint,
+            aiCallAttempts: checkpoint.aiCallAttempts + 1,
+            updatedAt: Date.now(),
           },
         });
-        
-        if (checkpoint) {
-          set({
-            checkpoint: {
-              ...checkpoint,
-              aiCallAttempts: checkpoint.aiCallAttempts + 1,
-              updatedAt: new Date(),
-            },
-          });
-        }
-      },
+      }
+    },
       
       addTechnicalLog: (log) => {
         const currentState = get().networkRetryState;
@@ -331,13 +329,7 @@ export const useAnalysisCheckpoint = create<AnalysisCheckpointStore>()(
         if (!checkpoint.analysisStarted) return "ANALYSIS_START";
         if (!checkpoint.analysisComplete) return "ANALYSIS_CONTINUE";
         
-        return "COMPLETE";
-      },
-    }),
-    {
-      name: "aaic-analysis-checkpoint",
-      // Only persist checkpoint, not ephemeral network state
-      partialize: (state) => ({ checkpoint: state.checkpoint }),
-    }
-  )
+      return "COMPLETE";
+    },
+  })
 );
