@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export type WorkflowPhase = "POLICY_IMPORT" | "CASE_IMPORT" | "ANALYSIS" | "IDLE";
-export type WorkflowState = "RUNNING" | "BLOCKED" | "COMPLETE" | "ERROR" | "IDLE";
+export type WorkflowState = "RUNNING" | "BLOCKED" | "COMPLETE" | "ERROR" | "IDLE" | "NETWORK_RETRY_READY";
 
 export interface WorkflowStage {
   id: string;
@@ -36,6 +36,7 @@ export const ANALYSIS_STAGES: WorkflowStage[] = [
   { id: "LICENSE_ALIGNMENT_CHECK", label: "የፍቃድ ማመሳከር (License Alignment Check)", progress: 70 },
   { id: "ESSENTIALITY_EVALUATION", label: "አስፈላጊነት ግምገማ (Essentiality Evaluation)", progress: 85 },
   { id: "DECISION_TABLE_AND_CITATIONS_OUTPUT", label: "ውጤቶችን ማዘጋጀት (Generating Results)", progress: 100 },
+  { id: "NETWORK_RETRY_READY", label: "የአይ ግንኙነት ተቋርጧል (Network Retry Ready)", progress: 55 },
 ];
 
 export interface WorkflowStatus {
@@ -49,6 +50,9 @@ export interface WorkflowStatus {
   documentStatuses: DocumentStatus[];
   policyLibraryReady: boolean;
   caseFilesReady: boolean;
+  // Network error state
+  isNetworkError: boolean;
+  networkErrorStage: string | null;
 }
 
 export interface DocumentStatus {
@@ -78,6 +82,8 @@ interface WorkflowStore {
   completeAnalysis: () => void;
   blockAnalysis: (reason: string, nextAction: string) => void;
   errorAnalysis: (reason: string) => void;
+  setNetworkRetryReady: (stage: string) => void;
+  clearNetworkError: () => void;
   
   addDocumentStatus: (doc: DocumentStatus) => void;
   updateDocumentStatus: (name: string, updates: Partial<DocumentStatus>) => void;
@@ -98,6 +104,8 @@ const initialStatus: WorkflowStatus = {
   documentStatuses: [],
   policyLibraryReady: false,
   caseFilesReady: false,
+  isNetworkError: false,
+  networkErrorStage: null,
 };
 
 export const useWorkflowStatus = create<WorkflowStore>((set, get) => ({
@@ -302,6 +310,35 @@ export const useWorkflowStatus = create<WorkflowStore>((set, get) => ({
         state: "ERROR",
         blockingReason: reason,
         nextAction: "እባክዎ እንደገና ይሞክሩ ወይም ድጋፍን ያግኙ (Please Retry or Contact Support)",
+      },
+    });
+  },
+
+  setNetworkRetryReady: (stage: string) => {
+    set({
+      status: {
+        ...get().status,
+        phase: "ANALYSIS",
+        stageId: "NETWORK_RETRY_READY",
+        stageLabel: "የአይ ኔትዎርክ ግንኙነት ተቋርጧል (AI Network Retry Ready)",
+        state: "NETWORK_RETRY_READY",
+        blockingReason: "AI gateway transient error (502/timeout)",
+        nextAction: "ደግመው ይሞክሩ ወይም ከመጨረሻ ነጥብ ቀጥል (Retry or Resume from Checkpoint)",
+        isNetworkError: true,
+        networkErrorStage: stage,
+      },
+    });
+  },
+
+  clearNetworkError: () => {
+    set({
+      status: {
+        ...get().status,
+        isNetworkError: false,
+        networkErrorStage: null,
+        state: "RUNNING",
+        blockingReason: null,
+        nextAction: null,
       },
     });
   },

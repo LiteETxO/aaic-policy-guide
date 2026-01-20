@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useWorkflowStatus } from "@/hooks/useWorkflowStatus";
 import { useDecisionTrace, createTraceEvent, createEngagementSignal } from "@/hooks/useDecisionTrace";
+import { useAnalysisCheckpoint, classifyError, type ClassifiedError } from "@/hooks/useAnalysisCheckpoint";
+import { NetworkRetryPanel } from "@/components/NetworkRetryPanel";
 
 interface UploadZone {
   id: string;
@@ -24,6 +26,8 @@ interface UploadZone {
 interface DocumentUploadProps {
   onAnalyze: (analysisResult: any) => void;
 }
+
+const BACKOFF_DELAY_MS = 2000;
 
 const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
   const { user } = useAuth();
@@ -51,6 +55,7 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
   ]);
 
   const [dragOver, setDragOver] = useState<string | null>(null);
+  const [networkError, setNetworkError] = useState<ClassifiedError | null>(null);
 
   const {
     status,
@@ -63,6 +68,8 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
     completeAnalysis,
     blockAnalysis,
     errorAnalysis,
+    setNetworkRetryReady,
+    clearNetworkError: clearWorkflowNetworkError,
     addDocumentStatus,
     updateDocumentStatus,
     setCaseFilesReady,
@@ -74,6 +81,19 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
     setAnalyzing,
     clear: clearTrace,
   } = useDecisionTrace();
+
+  const {
+    checkpoint,
+    networkRetryState,
+    createCheckpoint,
+    updateCheckpoint,
+    clearCheckpoint,
+    setNetworkError: setCheckpointNetworkError,
+    clearNetworkError: clearCheckpointNetworkError,
+    incrementRetry,
+    addTechnicalLog,
+    canResume,
+  } = useAnalysisCheckpoint();
 
   // Update case files ready status when both files are uploaded
   useEffect(() => {
@@ -250,8 +270,17 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
 
   const hasRequiredFiles = uploadZones[0].file && uploadZones[1].file;
 
-  const handleAnalyze = async () => {
+  /**
+   * Core analysis function with checkpointing.
+   * Can be called for initial analysis or resume.
+   */
+  const executeAnalysis = async (isResume: boolean = false) => {
     if (!hasRequiredFiles) return;
+
+    // Clear network error state
+    setNetworkError(null);
+    clearCheckpointNetworkError();
+    clearWorkflowNetworkError();
 
     // Check prerequisites
     if (!status.policyLibraryReady) {
@@ -268,24 +297,48 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
       return;
     }
 
-    // Clear previous trace and start new analysis
-    clearTrace();
+    // Create checkpoint if starting fresh
+    if (!isResume) {
+      clearTrace();
+      createCheckpoint();
+    }
+
     setIsAnalyzing(true);
     setAnalyzing(true);
     startAnalysis();
 
-    try {
-      const licenseZone = uploadZones.find(z => z.id === "license");
-      const invoiceZone = uploadZones.find(z => z.id === "invoice");
+    const licenseZone = uploadZones.find(z => z.id === "license");
+    const invoiceZone = uploadZones.find(z => z.id === "invoice");
 
-      // Trace: Document ingestion
-      addEvent(createTraceEvent.documentIngestion(licenseZone?.file?.name || "License", "started"));
-      addEvent(createTraceEvent.documentIngestion(invoiceZone?.file?.name || "Invoice", "complete"));
+    try {
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // CHECKPOINT 1: Document parsing (skip if resuming with documents already parsed)
+      // ═══════════════════════════════════════════════════════════════════════════════
+      if (!isResume || !checkpoint?.documentsParseComplete) {
+        addEvent(createTraceEvent.documentIngestion(licenseZone?.file?.name || "License", "started"));
+        addEvent(createTraceEvent.documentIngestion(invoiceZone?.file?.name || "Invoice", "complete"));
+        
+        updateCheckpoint({
+          documentsParseComplete: true,
+          ocrComplete: true,
+          licenseText: licenseZone?.fileText,
+          invoiceText: invoiceZone?.fileText,
+          licenseFileName: licenseZone?.file?.name,
+          invoiceFileName: invoiceZone?.file?.name,
+        });
+        
+        addTechnicalLog("Documents parsed and checkpoint saved");
+      } else {
+        addEvent(createTraceEvent.info("Resuming from checkpoint — documents already parsed"));
+        addTechnicalLog("Resuming from checkpoint with existing document data");
+      }
 
       updateAnalysisStage("ITEM_NORMALIZATION");
       addEvent(createTraceEvent.info("Starting item normalization..."));
 
-      // Prepare policy documents for the AI
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // CHECKPOINT 2: Prepare policy documents
+      // ═══════════════════════════════════════════════════════════════════════════════
       const policyDocsForAI = policyDocuments?.map(doc => ({
         name: doc.name,
         directive_number: doc.directive_number,
@@ -311,34 +364,98 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
         return;
       }
 
+      updateCheckpoint({
+        policyDocumentIds: policyDocuments?.map(d => d.id),
+      });
+
       updateAnalysisStage("LIST_MATCHING");
       addEvent(createTraceEvent.info("Querying PolicyClauseIndex for matching clauses..."));
 
-      // Call the edge function
-      const { data, error } = await supabase.functions.invoke("analyze-documents", {
-        body: {
-          licenseText: licenseZone?.fileText || `License file: ${licenseZone?.file?.name}`,
-          invoiceText: invoiceZone?.fileText || `Invoice file: ${invoiceZone?.file?.name}`,
-          policyDocuments: policyDocsForAI,
-        },
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // CHECKPOINT 3: Before AI call (critical - save everything)
+      // ═══════════════════════════════════════════════════════════════════════════════
+      updateCheckpoint({
+        invoiceItemsExtracted: true,
+        clausesRetrieved: true, // Will be updated with actual count after call
+        analysisStarted: true,
+        lastAICallStage: "AI_GATEWAY_CALL",
+        lastAICallTimestamp: new Date(),
       });
+      
+      addTechnicalLog("Checkpoint saved before AI gateway call");
 
+      // Call the edge function with timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
+      let data: any;
+      let error: any;
+
+      try {
+        const response = await supabase.functions.invoke("analyze-documents", {
+          body: {
+            licenseText: licenseZone?.fileText || `License file: ${licenseZone?.file?.name}`,
+            invoiceText: invoiceZone?.fileText || `Invoice file: ${invoiceZone?.file?.name}`,
+            policyDocuments: policyDocsForAI,
+          },
+        });
+        
+        clearTimeout(timeoutId);
+        data = response.data;
+        error = response.error;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        error = fetchError;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // ERROR CLASSIFICATION AND HANDLING
+      // ═══════════════════════════════════════════════════════════════════════════════
       if (error) {
         console.error("Analysis error:", error);
-        errorAnalysis(error.message || "Failed to analyze documents");
-        addEvent(createTraceEvent.error(error.message || "Failed to analyze documents"));
-        toast.error(error.message || "Failed to analyze documents");
-        setAnalyzing(false);
-        return;
+        const classifiedError = classifyError(error, "AI_GATEWAY_CALL");
+        
+        if (classifiedError.category === "TRANSIENT_NETWORK") {
+          // Handle transient network error - show retry UI
+          handleTransientNetworkError(classifiedError);
+          return;
+        } else {
+          // Non-retryable error
+          errorAnalysis(error.message || "Failed to analyze documents");
+          addEvent(createTraceEvent.error(error.message || "Failed to analyze documents"));
+          toast.error(error.message || "Failed to analyze documents");
+          setAnalyzing(false);
+          setIsAnalyzing(false);
+          return;
+        }
       }
 
       if (data?.error) {
+        const classifiedError = classifyError({ message: data.error }, "AI_RESPONSE_PROCESSING");
+        
+        if (classifiedError.category === "TRANSIENT_NETWORK") {
+          handleTransientNetworkError(classifiedError);
+          return;
+        }
+        
         errorAnalysis(data.error);
         addEvent(createTraceEvent.error(data.error));
         toast.error(data.error);
         setAnalyzing(false);
+        setIsAnalyzing(false);
         return;
       }
+
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // SUCCESS - Update checkpoint and process results
+      // ═══════════════════════════════════════════════════════════════════════════════
+      updateCheckpoint({
+        clausesRetrieved: true,
+        clauseCount: data?.clausesRetrieved || 0,
+        analysisComplete: true,
+      });
+      
+      addTechnicalLog(`Analysis complete. Clauses retrieved: ${data?.clausesRetrieved || 0}`);
 
       updateAnalysisStage("LICENSE_ALIGNMENT_CHECK");
       addEvent(createTraceEvent.info("Checking license alignment for each item..."));
@@ -374,6 +491,9 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
           addEngagementSignal(createEngagementSignal.readyForReport());
         }
         
+        // Clear checkpoint on success
+        clearCheckpoint();
+        
         toast.success("Analysis complete!");
         onAnalyze(data.analysis);
       } else {
@@ -381,15 +501,80 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
         addEvent(createTraceEvent.error("Unexpected response from analysis"));
         toast.error("Unexpected response from analysis");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Analysis error:", error);
-      errorAnalysis("An error occurred during analysis");
-      addEvent(createTraceEvent.error("An error occurred during analysis"));
-      toast.error("An error occurred during analysis");
-    } finally {
-      setIsAnalyzing(false);
-      setAnalyzing(false);
+      const classifiedError = classifyError(error, "ANALYSIS_EXECUTION");
+      
+      if (classifiedError.category === "TRANSIENT_NETWORK") {
+        handleTransientNetworkError(classifiedError);
+      } else {
+        errorAnalysis("An error occurred during analysis");
+        addEvent(createTraceEvent.error("An error occurred during analysis"));
+        toast.error("An error occurred during analysis");
+        setIsAnalyzing(false);
+        setAnalyzing(false);
+      }
     }
+  };
+
+  /**
+   * Handle transient network errors with proper UI and state management.
+   */
+  const handleTransientNetworkError = (classifiedError: ClassifiedError) => {
+    setNetworkError(classifiedError);
+    setCheckpointNetworkError(classifiedError);
+    setNetworkRetryReady(classifiedError.stage);
+    
+    addEvent(createTraceEvent.warning(
+      `${classifiedError.messageAmharic} (${classifiedError.message})`
+    ));
+    addTechnicalLog(`Network error: ${classifiedError.technicalDetails}`);
+    
+    toast.error(classifiedError.messageAmharic, {
+      description: "Your progress has been saved. Click Retry to continue.",
+      duration: 10000,
+    });
+    
+    setIsAnalyzing(false);
+    setAnalyzing(false);
+    
+    // Attempt auto-retry if allowed (only 1 auto-retry)
+    if (networkRetryState.canAutoRetry && networkRetryState.retryCount < 1) {
+      addTechnicalLog("Attempting automatic retry after backoff...");
+      setTimeout(() => {
+        handleRetry();
+      }, BACKOFF_DELAY_MS);
+    }
+  };
+
+  /**
+   * Handle retry button click.
+   */
+  const handleRetry = async () => {
+    incrementRetry();
+    addTechnicalLog("User initiated retry");
+    await executeAnalysis(true);
+  };
+
+  /**
+   * Handle resume from checkpoint.
+   */
+  const handleResume = async () => {
+    if (!canResume()) {
+      toast.error("Cannot resume — checkpoint data incomplete. Starting fresh analysis.");
+      await executeAnalysis(false);
+      return;
+    }
+    
+    addTechnicalLog("User initiated resume from checkpoint");
+    await executeAnalysis(true);
+  };
+
+  /**
+   * Main analyze button handler.
+   */
+  const handleAnalyze = async () => {
+    await executeAnalysis(false);
   };
 
   // Process analysis result and emit trace events
@@ -492,6 +677,31 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
       addEngagementSignal(createEngagementSignal.awaitingClarification());
     }
   };
+
+  // Show network retry panel if there's a network error
+  if (networkError) {
+    return (
+      <section className="py-16 bg-muted/30">
+        <div className="container">
+          <div className="max-w-2xl mx-auto">
+            <NetworkRetryPanel
+              error={networkError}
+              onRetry={handleRetry}
+              onResume={handleResume}
+              isRetrying={isAnalyzing}
+              checkpoint={checkpoint ? {
+                clausesRetrieved: checkpoint.clausesRetrieved,
+                clauseCount: checkpoint.clauseCount,
+                documentsParseComplete: checkpoint.documentsParseComplete,
+                invoiceItemsExtracted: checkpoint.invoiceItemsExtracted,
+                extractedItemCount: checkpoint.extractedItemCount,
+              } : undefined}
+            />
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-16 bg-muted/30">
