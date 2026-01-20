@@ -379,7 +379,7 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
         clausesRetrieved: true, // Will be updated with actual count after call
         analysisStarted: true,
         lastAICallStage: "AI_GATEWAY_CALL",
-        lastAICallTimestamp: new Date(),
+        lastAICallTimestamp: Date.now(),
       });
       
       addTechnicalLog("Checkpoint saved before AI gateway call");
