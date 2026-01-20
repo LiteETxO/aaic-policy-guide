@@ -3,7 +3,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { 
   CheckCircle2, AlertTriangle, XCircle, Loader2, 
-  FileText, BookOpen, Search, AlertOctagon, ChevronDown
+  FileText, BookOpen, Search, AlertOctagon, ChevronDown, WifiOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -24,6 +24,7 @@ const stateConfig: Record<WorkflowState, { label: string; icon: React.ElementTyp
   BLOCKED: { label: "ታግዷል (Blocked)", icon: AlertOctagon, bgColor: "bg-warning/10", textColor: "text-warning" },
   COMPLETE: { label: "ተጠናቀቀ (Complete)", icon: CheckCircle2, bgColor: "bg-success/10", textColor: "text-success" },
   ERROR: { label: "ስህተት (Error)", icon: XCircle, bgColor: "bg-destructive/10", textColor: "text-destructive" },
+  NETWORK_RETRY_READY: { label: "ግንኙነት ተቋርጧል (Connection Issue)", icon: WifiOff, bgColor: "bg-warning/10", textColor: "text-warning" },
 };
 
 interface WorkflowStatusBarProps {
@@ -115,16 +116,22 @@ const WorkflowStatusBar = ({ className }: WorkflowStatusBarProps) => {
           <CollapsibleContent>
             <div className="px-4 pb-4 pt-0 space-y-3 border-t border-border/50">
               {/* Blocking Reason */}
-              {(state === "BLOCKED" || state === "ERROR") && blockingReason && (
+              {(state === "BLOCKED" || state === "ERROR" || state === "NETWORK_RETRY_READY") && blockingReason && (
                 <div className={cn(
                   "p-3 rounded-lg mt-3",
-                  state === "BLOCKED" ? "bg-warning/10 border border-warning/20" : "bg-destructive/10 border border-destructive/20"
+                  state === "BLOCKED" ? "bg-warning/10 border border-warning/20" : 
+                  state === "NETWORK_RETRY_READY" ? "bg-warning/10 border border-warning/20" :
+                  "bg-destructive/10 border border-destructive/20"
                 )}>
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className={cn(
-                      "h-4 w-4 shrink-0 mt-0.5",
-                      state === "BLOCKED" ? "text-warning" : "text-destructive"
-                    )} />
+                    {state === "NETWORK_RETRY_READY" ? (
+                      <WifiOff className="h-4 w-4 shrink-0 mt-0.5 text-warning" />
+                    ) : (
+                      <AlertTriangle className={cn(
+                        "h-4 w-4 shrink-0 mt-0.5",
+                        state === "BLOCKED" ? "text-warning" : "text-destructive"
+                      )} />
+                    )}
                     <div>
                       <p className="text-sm font-medium">{blockingReason}</p>
                       {nextAction && (
