@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { 
   BookOpen, ShieldCheck, Lock, FileText, Calendar, User, Plus, 
-  Upload, Trash2, Edit2, FileCheck, AlertCircle, ExternalLink, Loader2
+  Upload, Trash2, Edit2, FileCheck, AlertCircle, ExternalLink, Loader2,
+  Sparkles, ListChecks
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { usePolicyDocuments, useUploadPolicyDocument, useDeletePolicyDocument, PolicyDocument } from "@/hooks/usePolicyDocuments";
+import { usePolicyClauseExtraction } from "@/hooks/usePolicyClauseExtraction";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +27,7 @@ const PolicyLibrary = () => {
   const { data: policyDocuments, isLoading, error } = usePolicyDocuments();
   const uploadMutation = useUploadPolicyDocument();
   const deleteMutation = useDeletePolicyDocument();
+  const { extractClauses, progress: extractionProgress, isExtracting } = usePolicyClauseExtraction();
   
   const {
     startPolicyImport,
@@ -38,6 +42,7 @@ const PolicyLibrary = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [showClauseManager, setShowClauseManager] = useState(false);
   const [uploadForm, setUploadForm] = useState({
     name: "",
     nameAmharic: "",
@@ -231,7 +236,7 @@ const PolicyLibrary = () => {
         updateDocumentStatus(file.name, { progress: 80 });
         
         // Directly upload the document
-        await uploadMutation.mutateAsync({
+        const uploadedDoc = await uploadMutation.mutateAsync({
           file,
           name: metadata.name || file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "),
           nameAmharic: metadata.nameAmharic || "",
@@ -242,6 +247,23 @@ const PolicyLibrary = () => {
           contentMarkdown: data.extractedText,
         });
 
+        updateDocumentStatus(file.name, { status: "complete", progress: 90 });
+        
+        // Auto-extract clauses from the uploaded document
+        if (uploadedDoc?.id && data.extractedText) {
+          toast.info("Extracting policy clauses...");
+          const extractResult = await extractClauses(
+            uploadedDoc.id,
+            data.extractedText,
+            metadata.name || file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "),
+            metadata.directiveNumber
+          );
+          
+          if (extractResult?.extractedCount) {
+            toast.success(`Extracted ${extractResult.extractedCount} clauses from policy document`);
+          }
+        }
+        
         updateDocumentStatus(file.name, { status: "complete", progress: 100 });
         completePolicyImport();
         toast.success(`Policy document imported: ${metadata.name || file.name}`);
@@ -261,7 +283,7 @@ const PolicyLibrary = () => {
   const handleUpload = async () => {
     if (!selectedFile || !uploadForm.name) return;
 
-    await uploadMutation.mutateAsync({
+    const uploadedDoc = await uploadMutation.mutateAsync({
       file: selectedFile,
       name: uploadForm.name,
       nameAmharic: uploadForm.nameAmharic,
@@ -271,6 +293,21 @@ const PolicyLibrary = () => {
       documentType: uploadForm.documentType,
       contentMarkdown: uploadForm.contentMarkdown,
     });
+
+    // Auto-extract clauses after manual upload
+    if (uploadedDoc?.id && uploadForm.contentMarkdown) {
+      toast.info("Extracting policy clauses...");
+      const extractResult = await extractClauses(
+        uploadedDoc.id,
+        uploadForm.contentMarkdown,
+        uploadForm.name,
+        uploadForm.directiveNumber
+      );
+      
+      if (extractResult?.extractedCount) {
+        toast.success(`Extracted ${extractResult.extractedCount} clauses`);
+      }
+    }
 
     setShowUploadDialog(false);
     setUploadForm({
@@ -320,6 +357,16 @@ const PolicyLibrary = () => {
                 </Button>
               ) : isAdmin ? (
                 <div className="flex items-center gap-2">
+                  {/* Manage Clauses Button */}
+                  <Button 
+                    variant="outline" 
+                    className="gap-2"
+                    onClick={() => setShowClauseManager(true)}
+                  >
+                    <ListChecks className="h-4 w-4" />
+                    Manage Clauses
+                  </Button>
+                  
                   {/* Quick Import Button */}
                   <div className="relative">
                     <input
@@ -327,7 +374,7 @@ const PolicyLibrary = () => {
                       type="file"
                       accept=".pdf"
                       className="hidden"
-                      disabled={isParsing}
+                      disabled={isParsing || isExtracting}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleQuickImport(file);
@@ -338,16 +385,16 @@ const PolicyLibrary = () => {
                       <Button 
                         variant="outline" 
                         className="gap-2 cursor-pointer" 
-                        disabled={isParsing}
+                        disabled={isParsing || isExtracting}
                         asChild
                       >
                         <span>
-                          {isParsing ? (
+                          {isParsing || isExtracting ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <Upload className="h-4 w-4" />
                           )}
-                          {isParsing ? "Importing..." : "Quick Import"}
+                          {isParsing ? "Importing..." : isExtracting ? "Extracting..." : "Quick Import"}
                         </span>
                       </Button>
                     </label>
@@ -706,6 +753,22 @@ const PolicyLibrary = () => {
           </Card>
         )}
 
+        {/* Extraction Progress Indicator */}
+        {isExtracting && (
+          <Card className="mt-6 border-primary/30 bg-primary/5">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{extractionProgress.message}</p>
+                  <p className="text-xs text-muted-foreground">Extracting articles, annexes, and capital goods items...</p>
+                </div>
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border/50">
           <div className="flex items-start gap-3">
             <ShieldCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
@@ -721,7 +784,147 @@ const PolicyLibrary = () => {
       </div>
 
       <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />
+      
+      {/* Policy Clause Manager Dialog */}
+      <Dialog open={showClauseManager} onOpenChange={setShowClauseManager}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListChecks className="h-5 w-5" />
+              Policy Clause Manager
+            </DialogTitle>
+            <DialogDescription>
+              Review, edit, and verify extracted policy clauses for accurate invoice matching.
+            </DialogDescription>
+          </DialogHeader>
+          <PolicyClauseManagerInline />
+        </DialogContent>
+      </Dialog>
     </section>
+  );
+};
+
+// Inline version of PolicyClauseManager to avoid circular imports
+const PolicyClauseManagerInline = () => {
+  const [clauses, setClauses] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchClauses = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("policy_clauses")
+          .select("*")
+          .order("section_number", { ascending: true })
+          .limit(100);
+
+        if (error) throw error;
+        setClauses(data || []);
+      } catch (err) {
+        console.error("Error fetching clauses:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchClauses();
+  }, []);
+
+  const verifiedCount = clauses.filter(c => c.is_verified).length;
+  const itemCount = clauses.filter(c => c.section_type === "item").length;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 py-6">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="text-xl font-bold">{clauses.length}</div>
+            <p className="text-xs text-muted-foreground">Total Clauses</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="text-xl font-bold text-success">{verifiedCount}</div>
+            <p className="text-xs text-muted-foreground">Verified</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="text-xl font-bold text-warning">{clauses.length - verifiedCount}</div>
+            <p className="text-xs text-muted-foreground">Pending</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="text-xl font-bold text-primary">{itemCount}</div>
+            <p className="text-xs text-muted-foreground">Capital Goods</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Clauses List */}
+      {clauses.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>No clauses extracted yet</p>
+          <p className="text-sm">Upload a policy document to extract clauses automatically</p>
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          <div className="max-h-[400px] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 sticky top-0">
+                <tr>
+                  <th className="text-left p-3 font-medium">Clause ID</th>
+                  <th className="text-left p-3 font-medium">Heading</th>
+                  <th className="text-left p-3 font-medium">Type</th>
+                  <th className="text-center p-3 font-medium">Page</th>
+                  <th className="text-left p-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clauses.map((clause) => (
+                  <tr key={clause.id} className="border-t hover:bg-muted/30">
+                    <td className="p-3 font-mono text-xs">{clause.clause_id}</td>
+                    <td className="p-3">
+                      <p className="font-medium truncate max-w-[250px]">{clause.clause_heading}</p>
+                    </td>
+                    <td className="p-3">
+                      <Badge variant="secondary" className="text-xs capitalize">
+                        {clause.section_type}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-center">{clause.page_number}</td>
+                    <td className="p-3">
+                      {clause.is_verified ? (
+                        <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs">
+                          Verified
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">Pending</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground text-center">
+        For full clause management, use the dedicated Policy Clause Manager component.
+      </p>
+    </div>
   );
 };
 
