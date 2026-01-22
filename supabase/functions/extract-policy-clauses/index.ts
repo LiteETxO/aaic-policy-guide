@@ -34,7 +34,7 @@ Return a JSON object with this exact structure:
   "clauses": [
     {
       "clause_id": "DIR[number]_ART[X]_[descriptor]",
-      "section_type": "article|annex|schedule|item|definition|provision",
+      "section_type": "Article|Annex|Schedule|Item",
       "section_number": "Article 16(2)" or "Annex II - Category 1 - Item 3",
       "page_number": 5,
       "clause_heading": "Eligibility Criteria for Duty-Free Import",
@@ -75,7 +75,7 @@ If the document contains:
 Extract as:
 {
   "clause_id": "DIR1064_ANNEX2_CAT1_001",
-  "section_type": "item",
+  "section_type": "Item",
   "section_number": "Annex II - Category 1 - Item 1",
   "clause_heading": "CNC Turning Machines",
   "clause_text": "CNC turning machines, lathes, and milling machines for manufacturing",
@@ -86,58 +86,26 @@ Extract as:
 
 Parse the document thoroughly. Missing items means invoice matching will fail.`;
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+// Initialize Supabase client
+function getSupabaseClient() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  return createClient(supabaseUrl, supabaseKey);
+}
 
+// Background extraction task
+async function performExtraction(
+  documentId: string,
+  documentText: string,
+  documentName: string,
+  directiveNumber: string | null
+) {
+  const supabase = getSupabaseClient();
+  
   try {
-    let { documentId, documentText, documentName, directiveNumber } = await req.json();
-
-    if (!documentId) {
-      return new Response(
-        JSON.stringify({ error: "Missing required field: documentId" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // If documentText not provided, fetch from database
-    if (!documentText) {
-      console.log(`Fetching document content from database for: ${documentId}`);
-      const { data: docData, error: docError } = await supabase
-        .from("policy_documents")
-        .select("name, content_markdown, content_text, directive_number")
-        .eq("id", documentId)
-        .single();
-
-      if (docError || !docData) {
-        console.error("Error fetching document:", docError);
-        return new Response(
-          JSON.stringify({ error: "Document not found", details: docError?.message }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      documentText = docData.content_markdown || docData.content_text;
-      documentName = documentName || docData.name;
-      directiveNumber = directiveNumber || docData.directive_number;
-
-      if (!documentText) {
-        return new Response(
-          JSON.stringify({ error: "Document has no content to extract from" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    console.log(`Extracting clauses from document: ${documentId}`);
-    console.log(`Document name: ${documentName}`);
-    console.log(`Document text length: ${documentText.length} characters`);
+    console.log(`[BG] Starting extraction for document: ${documentId}`);
+    console.log(`[BG] Document name: ${documentName}`);
+    console.log(`[BG] Text length: ${documentText.length} characters`);
 
     // Call AI to extract clauses
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
@@ -152,7 +120,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: EXTRACTION_PROMPT },
           { 
@@ -163,21 +131,21 @@ Document Name: ${documentName || "Unknown"}
 Directive Number: ${directiveNumber || "Unknown"}
 
 --- DOCUMENT TEXT ---
-${documentText.substring(0, 100000)}
+${documentText.substring(0, 120000)}
 --- END DOCUMENT TEXT ---
 
 Return the JSON structure as specified. Be thorough - extract EVERY article and EVERY item from annexes/schedules.`
           }
         ],
         temperature: 0,
-        max_tokens: 32000,
+        max_tokens: 64000,
         response_format: { type: "json_object" }
       }),
     });
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("AI API error:", errorText);
+      console.error("[BG] AI API error:", errorText);
       throw new Error(`AI API error: ${aiResponse.status}`);
     }
 
@@ -188,20 +156,20 @@ Return the JSON structure as specified. Be thorough - extract EVERY article and 
       throw new Error("No content in AI response");
     }
 
-    console.log("AI response received, parsing...");
+    console.log("[BG] AI response received, parsing...");
 
     let extractedData;
     try {
       extractedData = JSON.parse(content);
     } catch (parseError) {
-      console.error("Failed to parse AI response:", content.substring(0, 500));
+      console.error("[BG] Failed to parse AI response:", content.substring(0, 500));
       throw new Error("Failed to parse AI response as JSON");
     }
 
     const clauses = extractedData.clauses || [];
     const summary = extractedData.summary || {};
 
-    console.log(`Extracted ${clauses.length} clauses`);
+    console.log(`[BG] Extracted ${clauses.length} clauses`);
 
     // Delete existing clauses for this document (to handle re-extraction)
     const { error: deleteError } = await supabase
@@ -210,7 +178,7 @@ Return the JSON structure as specified. Be thorough - extract EVERY article and 
       .eq("policy_document_id", documentId);
 
     if (deleteError) {
-      console.error("Error deleting existing clauses:", deleteError);
+      console.error("[BG] Error deleting existing clauses:", deleteError);
     }
 
     // Insert extracted clauses
@@ -246,27 +214,104 @@ Return the JSON structure as specified. Be thorough - extract EVERY article and 
         .insert(batch);
 
       if (insertError) {
-        console.error(`Error inserting batch ${i / batchSize + 1}:`, insertError);
+        console.error(`[BG] Error inserting batch ${i / batchSize + 1}:`, insertError);
       } else {
         insertedCount += batch.length;
       }
     }
 
-    console.log(`Inserted ${insertedCount} clauses into database`);
+    console.log(`[BG] Successfully inserted ${insertedCount} clauses for document: ${documentId}`);
+    
+    // Update the policy document with extraction summary
+    await supabase
+      .from("policy_documents")
+      .update({
+        total_articles: summary.total_articles || clauses.length,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", documentId);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        extractedCount: clauses.length,
-        insertedCount,
-        summary: {
-          ...summary,
+    return { success: true, extractedCount: clauses.length, insertedCount };
+  } catch (error) {
+    console.error("[BG] Extraction error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    let { documentId, documentText, documentName, directiveNumber } = await req.json();
+
+    if (!documentId) {
+      return new Response(
+        JSON.stringify({ error: "Missing required field: documentId" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = getSupabaseClient();
+
+    // If documentText not provided, fetch from database
+    if (!documentText) {
+      console.log(`Fetching document content from database for: ${documentId}`);
+      const { data: docData, error: docError } = await supabase
+        .from("policy_documents")
+        .select("name, content_markdown, content_text, directive_number")
+        .eq("id", documentId)
+        .single();
+
+      if (docError || !docData) {
+        console.error("Error fetching document:", docError);
+        return new Response(
+          JSON.stringify({ error: "Document not found", details: docError?.message }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      documentText = docData.content_markdown || docData.content_text;
+      documentName = documentName || docData.name;
+      directiveNumber = directiveNumber || docData.directive_number;
+
+      if (!documentText) {
+        return new Response(
+          JSON.stringify({ error: "Document has no content to extract from" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    console.log(`Starting background extraction for document: ${documentId}`);
+    console.log(`Document name: ${documentName}`);
+    console.log(`Document text length: ${documentText.length} characters`);
+
+    // Use EdgeRuntime.waitUntil to run extraction in background
+    // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(performExtraction(documentId, documentText, documentName, directiveNumber));
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Extraction started in background",
           documentId,
           documentName,
-        },
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+          textLength: documentText.length,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else {
+      // Fallback: run synchronously if EdgeRuntime not available
+      const result = await performExtraction(documentId, documentText, documentName, directiveNumber);
+      return new Response(
+        JSON.stringify(result),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Extraction failed";
