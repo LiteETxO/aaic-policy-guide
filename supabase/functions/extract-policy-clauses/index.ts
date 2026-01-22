@@ -24,8 +24,8 @@ Parse the provided policy document text and extract ALL clauses, articles, and i
 - Generate keywords for matching (e.g., "CNC", "lathe", "milling", "manufacturing")
 
 ### Classification Rules:
-- applies_to values: "capital_goods", "customs_duty", "income_tax", "essentiality", "investment_permit", "export_promotion"
-- section_type values: "article", "annex", "schedule", "item", "definition", "provision"
+- applies_to values: "capital_goods", "customs_duty", "income_tax", "essentiality", "exclusion", "general_incentive"
+- section_type values: "Article", "Annex", "Schedule", "Item"
 - inclusion_type values: "enabling" (grants benefits), "restrictive" (limits benefits), "exclusion" (denies benefits), "procedural" (process requirements)
 
 ## OUTPUT FORMAT
@@ -92,22 +92,52 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { documentId, documentText, documentName, directiveNumber } = await req.json();
+    let { documentId, documentText, documentName, directiveNumber } = await req.json();
 
-    if (!documentId || !documentText) {
+    if (!documentId) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: documentId, documentText" }),
+        JSON.stringify({ error: "Missing required field: documentId" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    console.log(`Extracting clauses from document: ${documentId}`);
-    console.log(`Document text length: ${documentText.length} characters`);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // If documentText not provided, fetch from database
+    if (!documentText) {
+      console.log(`Fetching document content from database for: ${documentId}`);
+      const { data: docData, error: docError } = await supabase
+        .from("policy_documents")
+        .select("name, content_markdown, content_text, directive_number")
+        .eq("id", documentId)
+        .single();
+
+      if (docError || !docData) {
+        console.error("Error fetching document:", docError);
+        return new Response(
+          JSON.stringify({ error: "Document not found", details: docError?.message }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      documentText = docData.content_markdown || docData.content_text;
+      documentName = documentName || docData.name;
+      directiveNumber = directiveNumber || docData.directive_number;
+
+      if (!documentText) {
+        return new Response(
+          JSON.stringify({ error: "Document has no content to extract from" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    console.log(`Extracting clauses from document: ${documentId}`);
+    console.log(`Document name: ${documentName}`);
+    console.log(`Document text length: ${documentText.length} characters`);
 
     // Call AI to extract clauses
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
@@ -249,22 +279,42 @@ Return the JSON structure as specified. Be thorough - extract EVERY article and 
 });
 
 // Helper function to map section types to valid enum values
+// Valid enum: "Article" | "Annex" | "Schedule" | "Item"
 function mapSectionType(type: string): string {
   const typeMap: Record<string, string> = {
-    "article": "article",
-    "annex": "annex",
-    "schedule": "schedule",
-    "item": "item",
-    "definition": "definition",
-    "provision": "provision",
+    "article": "Article",
+    "annex": "Annex",
+    "schedule": "Schedule",
+    "item": "Item",
+    "definition": "Article",
+    "provision": "Article",
   };
-  return typeMap[type?.toLowerCase()] || "article";
+  return typeMap[type?.toLowerCase()] || "Article";
 }
 
 // Helper function to map applies_to values to valid enum array
+// Valid enum: "capital_goods" | "customs_duty" | "income_tax" | "essentiality" | "exclusion" | "general_incentive"
 function mapAppliesTo(values: string[]): string[] {
-  const validValues = ["capital_goods", "customs_duty", "income_tax", "essentiality", "investment_permit", "export_promotion"];
-  return values.filter(v => validValues.includes(v?.toLowerCase())).map(v => v.toLowerCase());
+  const validValues = ["capital_goods", "customs_duty", "income_tax", "essentiality", "exclusion", "general_incentive"];
+  const mappedValues: string[] = [];
+  
+  for (const v of values) {
+    const lower = v?.toLowerCase() || "";
+    if (validValues.includes(lower)) {
+      mappedValues.push(lower);
+    } else if (lower.includes("permit") || lower.includes("license")) {
+      mappedValues.push("general_incentive");
+    } else if (lower.includes("export")) {
+      mappedValues.push("general_incentive");
+    } else if (lower.includes("tax") && lower.includes("income")) {
+      mappedValues.push("income_tax");
+    } else if (lower.includes("customs") || lower.includes("duty")) {
+      mappedValues.push("customs_duty");
+    }
+  }
+  
+  // Remove duplicates and return
+  return [...new Set(mappedValues)];
 }
 
 // Helper function to map inclusion type to valid enum value
