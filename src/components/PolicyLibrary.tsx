@@ -42,6 +42,7 @@ const PolicyLibrary = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [parseProgress, setParseProgress] = useState({ value: 0, message: "Starting..." });
   const [showClauseManager, setShowClauseManager] = useState(false);
   const [uploadForm, setUploadForm] = useState({
     name: "",
@@ -185,6 +186,7 @@ const PolicyLibrary = () => {
     }
 
     setIsParsing(true);
+    setParseProgress({ value: 10, message: "Preparing document..." });
     toast.info("Parsing and importing document...");
     
     // Start policy import workflow
@@ -199,6 +201,7 @@ const PolicyLibrary = () => {
     try {
       updatePolicyImportStage("OCR_AND_TEXT_EXTRACTION");
       updateDocumentStatus(file.name, { status: "processing", progress: 20 });
+      setParseProgress({ value: 20, message: "Converting PDF to text..." });
       
       // Convert file to base64
       const arrayBuffer = await file.arrayBuffer();
@@ -210,6 +213,7 @@ const PolicyLibrary = () => {
       const base64 = btoa(binary);
 
       updateDocumentStatus(file.name, { progress: 30 });
+      setParseProgress({ value: 35, message: "Sending to parser..." });
 
       // Call parse-document edge function with metadata extraction
       const { data, error } = await supabase.functions.invoke("parse-document", {
@@ -225,12 +229,14 @@ const PolicyLibrary = () => {
 
       updatePolicyImportStage("STRUCTURE_DETECTION");
       updateDocumentStatus(file.name, { progress: 50 });
+      setParseProgress({ value: 50, message: "Extracting document structure..." });
 
       if (data?.extractedText) {
         const metadata = data.metadata || {};
         
         updatePolicyImportStage("POLICY_INDEX_BUILD");
         updateDocumentStatus(file.name, { progress: 65 });
+        setParseProgress({ value: 65, message: "Uploading to library..." });
         
         updatePolicyImportStage("CITATION_MAPPING");
         updateDocumentStatus(file.name, { progress: 80 });
@@ -248,6 +254,7 @@ const PolicyLibrary = () => {
         });
 
         updateDocumentStatus(file.name, { status: "complete", progress: 90 });
+        setParseProgress({ value: 85, message: "Extracting policy clauses..." });
         
         // Auto-extract clauses from the uploaded document
         if (uploadedDoc?.id && data.extractedText) {
@@ -265,6 +272,7 @@ const PolicyLibrary = () => {
         }
         
         updateDocumentStatus(file.name, { status: "complete", progress: 100 });
+        setParseProgress({ value: 100, message: "Complete!" });
         completePolicyImport();
         toast.success(`Policy document imported: ${metadata.name || file.name}`);
       } else if (data?.error) {
@@ -275,6 +283,7 @@ const PolicyLibrary = () => {
       updateDocumentStatus(file.name, { status: "error", error: "Import failed" });
       blockPolicyImport("Document import failed", "Please try manual upload or contact support");
       toast.error("Failed to import document. Please try manual upload.");
+      setParseProgress({ value: 0, message: "Failed" });
     } finally {
       setIsParsing(false);
     }
@@ -712,9 +721,13 @@ const PolicyLibrary = () => {
                 <>
                   <Loader2 className="h-12 w-12 text-primary mb-4 animate-spin" />
                   <h3 className="font-semibold mb-1">Importing Policy Document...</h3>
-                  <p className="text-sm text-muted-foreground text-center max-w-md">
+                  <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
                     Parsing document content and extracting metadata with AI. This may take a moment.
                   </p>
+                  <div className="w-full max-w-md">
+                    <Progress value={parseProgress.value} className="h-2" />
+                    <p className="text-xs text-muted-foreground text-center mt-2">{parseProgress.message}</p>
+                  </div>
                 </>
               ) : (
                 <>
@@ -749,6 +762,23 @@ const PolicyLibrary = () => {
                   )}
                 </>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Parsing Progress Bar - shown under upload area when parsing */}
+        {isParsing && policyDocuments && policyDocuments.length > 0 && (
+          <Card className="mt-4 border-primary/30 bg-primary/5 animate-fade-in">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4 mb-3">
+                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Parsing document...</p>
+                  <p className="text-xs text-muted-foreground">{parseProgress.message}</p>
+                </div>
+                <span className="text-sm font-medium text-primary">{parseProgress.value}%</span>
+              </div>
+              <Progress value={parseProgress.value} className="h-2" />
             </CardContent>
           </Card>
         )}
