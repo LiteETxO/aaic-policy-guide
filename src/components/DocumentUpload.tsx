@@ -419,8 +419,9 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
       addTechnicalLog("Checkpoint saved before AI gateway call");
 
       // Call the edge function with timeout handling
+      // Analysis can take up to 4 minutes for large invoices, so set a 5 minute timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
       let data: any;
       let error: any;
