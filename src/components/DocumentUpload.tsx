@@ -121,6 +121,14 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
 
     // For PDFs and images, use AI-powered parsing
     if (file.type === "application/pdf" || file.type.startsWith("image/")) {
+      // Check file size - limit to 10MB for reliable transmission
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`File ${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 10MB.`);
+        updateDocumentStatus(file.name, { status: "error", error: "File too large" });
+        return `[File too large: ${file.name} - ${(file.size / 1024 / 1024).toFixed(1)}MB exceeds 10MB limit]`;
+      }
+
       try {
         updateCaseImportStage("OCR_AND_TEXT_EXTRACTION");
         updateDocumentStatus(file.name, { status: "processing", progress: 25 });
@@ -135,46 +143,72 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
             const base64Data = result.split(",")[1];
             resolve(base64Data);
           };
-          reader.onerror = reject;
+          reader.onerror = (err) => reject(new Error("Failed to read file"));
           reader.readAsDataURL(file);
         });
 
         updateDocumentStatus(file.name, { progress: 50 });
 
-        // Call the parse-document edge function
-        const { data, error } = await supabase.functions.invoke("parse-document", {
-          body: {
-            fileBase64: base64,
-            fileName: file.name,
-            fileType: file.type,
-          },
-        });
+        // Call the parse-document edge function with retry logic
+        let retries = 0;
+        const maxRetries = 2;
+        let lastError: Error | null = null;
 
-        if (error) {
-          console.error("Parse error:", error);
-          updateDocumentStatus(file.name, { status: "error", error: error.message });
-          toast.error(`Failed to parse ${file.name}`);
-          return `[Parse error for ${file.name}: ${error.message}]`;
+        while (retries <= maxRetries) {
+          try {
+            const { data, error } = await supabase.functions.invoke("parse-document", {
+              body: {
+                fileBase64: base64,
+                fileName: file.name,
+                fileType: file.type,
+              },
+            });
+
+            if (error) {
+              // Check if it's a network/size error
+              if (error.message?.includes("Load failed") || error.message?.includes("Failed to send")) {
+                throw new Error("Network request failed - file may be too large");
+              }
+              console.error("Parse error:", error);
+              updateDocumentStatus(file.name, { status: "error", error: error.message });
+              toast.error(`Failed to parse ${file.name}`);
+              return `[Parse error for ${file.name}: ${error.message}]`;
+            }
+
+            if (data?.error) {
+              updateDocumentStatus(file.name, { status: "error", error: data.error });
+              toast.error(data.error);
+              return `[Parse error for ${file.name}: ${data.error}]`;
+            }
+
+            if (data?.extractedText) {
+              updateDocumentStatus(file.name, { status: "complete", progress: 100 });
+              toast.success(`Successfully parsed ${file.name}`);
+              return data.extractedText;
+            }
+
+            return `[No text extracted from ${file.name}]`;
+          } catch (fetchErr: any) {
+            lastError = fetchErr;
+            retries++;
+            if (retries <= maxRetries) {
+              console.log(`Retry ${retries}/${maxRetries} for ${file.name}...`);
+              toast.info(`Retrying parse for ${file.name}... (${retries}/${maxRetries})`);
+              await new Promise(r => setTimeout(r, 1000 * retries));
+            }
+          }
         }
 
-        if (data?.error) {
-          updateDocumentStatus(file.name, { status: "error", error: data.error });
-          toast.error(data.error);
-          return `[Parse error for ${file.name}: ${data.error}]`;
-        }
-
-        if (data?.extractedText) {
-          updateDocumentStatus(file.name, { status: "complete", progress: 100 });
-          toast.success(`Successfully parsed ${file.name}`);
-          return data.extractedText;
-        }
-
-        return `[No text extracted from ${file.name}]`;
-      } catch (err) {
+        // All retries failed
+        console.error("Parse error after retries:", lastError);
+        updateDocumentStatus(file.name, { status: "error", error: "Parse failed after retries" });
+        toast.error(`Error parsing ${file.name}: ${lastError?.message || "Network error"}`);
+        return `[Parse error for ${file.name}: ${lastError?.message || "Network error - try a smaller file"}]`;
+      } catch (err: any) {
         console.error("Parse error:", err);
-        updateDocumentStatus(file.name, { status: "error", error: "Parse failed" });
+        updateDocumentStatus(file.name, { status: "error", error: err.message || "Parse failed" });
         toast.error(`Error parsing ${file.name}`);
-        return `[Parse error for ${file.name}]`;
+        return `[Parse error for ${file.name}: ${err.message || "Unknown error"}]`;
       }
     }
 
