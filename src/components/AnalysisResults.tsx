@@ -319,6 +319,15 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
   const [showFormalReport, setShowFormalReport] = useState(false);
   const [showRawResponse, setShowRawResponse] = useState(false);
+  
+  // State for soft-block override - must be at top level before any conditional returns
+  const [proceedWithManualReview, setProceedWithManualReview] = useState(false);
+  
+  // State for Officer Verification Mode - must be at top level before any conditional returns
+  const [isOfficerVerificationMode, setIsOfficerVerificationMode] = useState(false);
+  
+  // Get trace functions - must be at top level before any conditional returns
+  const { addEvent, updateWorkflowStage } = useDecisionTrace();
 
   const tryRepairJson = (raw: string): AnalysisData | null => {
     try {
@@ -563,9 +572,6 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
     };
   }, [data, documentComprehension, licenseSnapshot]);
 
-  // Get trace functions
-  const { addEvent, updateWorkflowStage } = useDecisionTrace();
-
   // Emit trace events when analysis data changes - license-first workflow
   useEffect(() => {
     if (!data) return;
@@ -620,12 +626,6 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
       }
     });
   }, [data, licenseSnapshot, guidelineMappingData, complianceItems, addEvent]);
-
-  // State for soft-block override
-  const [proceedWithManualReview, setProceedWithManualReview] = useState(false);
-  
-  // State for Officer Verification Mode
-  const [isOfficerVerificationMode, setIsOfficerVerificationMode] = useState(false);
 
   // Build Investor & License Context Data
   const investorLicenseContextData = useMemo((): InvestorLicenseContextData | null => {
