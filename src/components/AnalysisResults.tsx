@@ -3,7 +3,7 @@ import {
   CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Scale, 
   AlertCircle, BookOpen, Quote, ChevronDown, ChevronRight, ExternalLink,
   ClipboardList, AlertOctagon, FileCheck, FileWarning, FileOutput, LayoutList,
-  Shield, Gauge
+  Shield, Gauge, Building2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,9 @@ import { cn } from "@/lib/utils";
 import { ReportGenerator } from "@/components/report/ReportGenerator";
 import { ConfidenceBadge, EvidenceChip, type ConfidenceLevel, type EvidenceData } from "@/components/gamification";
 import GuidelineMappingPanel, { type GuidelineMappingData, type GuidelineSection, type AllowedCategory } from "@/components/analysis/GuidelineMappingPanel";
+import InvestorLicenseContextPanel, { type InvestorLicenseContextData } from "@/components/analysis/InvestorLicenseContextPanel";
+import GoodsInterpretationTable, { type GoodsInterpretationRow } from "@/components/analysis/GoodsInterpretationTable";
+import OfficerVerificationToggle from "@/components/analysis/OfficerVerificationToggle";
 import { useDecisionTrace, createTraceEvent } from "@/hooks/useDecisionTrace";
 
 // Types matching the new AI output format with Policy Clause Index support
@@ -620,6 +623,137 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
 
   // State for soft-block override
   const [proceedWithManualReview, setProceedWithManualReview] = useState(false);
+  
+  // State for Officer Verification Mode
+  const [isOfficerVerificationMode, setIsOfficerVerificationMode] = useState(false);
+
+  // Build Investor & License Context Data
+  const investorLicenseContextData = useMemo((): InvestorLicenseContextData | null => {
+    if (!data) return null;
+    
+    const licenseUnderstanding = documentComprehension?.licenseUnderstanding;
+    
+    // Check for missing required fields
+    const missingFields: string[] = [];
+    if (!licenseSnapshot?.licensedActivity && !licenseUnderstanding?.licensedActivity) {
+      missingFields.push("የፍቃድ ስም / ተግባር (License Name / Activity)");
+    }
+    if (!guidelineMappingData || guidelineMappingData.mappingStatus === "not_found") {
+      missingFields.push("የፖሊሲ መመሪያ ካርታ (Policy Guideline Mapping)");
+    }
+    
+    const firstSection = guidelineMappingData?.matchedSections?.[0];
+    
+    return {
+      // Investor name - try to extract from various sources
+      investorName: (data as any).investorName || 
+                    (data as any).companyName || 
+                    licenseSnapshot?.licenseNumber ? `License #${licenseSnapshot.licenseNumber}` : undefined,
+      
+      // License information (verbatim)
+      licenseName: licenseSnapshot?.licensedActivity || 
+                   licenseUnderstanding?.licensedActivity || 
+                   "Investment License",
+      licenseNameAmharic: licenseSnapshot?.licensedActivityAmharic || 
+                          licenseUnderstanding?.licensedActivityAmharic,
+      licensedActivity: licenseSnapshot?.scopeOfOperation,
+      licenseNumber: licenseSnapshot?.licenseNumber || licenseUnderstanding?.licenseNumber,
+      
+      // License category
+      licenseCategory: licenseSnapshot?.sector,
+      isCategoryDerived: !!licenseSnapshot?.sector && !licenseUnderstanding?.licensedActivity,
+      
+      // Guideline mapping
+      guidelineMappingStatus: guidelineMappingData?.mappingStatus || "pending",
+      matchedGuidelineSection: firstSection?.sectionTitle,
+      matchedGuidelineSectionAmharic: firstSection?.sectionTitleAmharic,
+      guidelineArticle: firstSection?.articleNumber,
+      guidelinePageNumber: firstSection?.pageNumber,
+      guidelineDocumentName: guidelineMappingData?.sourceDocument,
+      
+      // Validation
+      isContextComplete: missingFields.length === 0 && guidelineMappingData?.mappingStatus !== "not_found",
+      missingFields: missingFields.length > 0 ? missingFields : undefined,
+    };
+  }, [data, licenseSnapshot, documentComprehension, guidelineMappingData]);
+
+  // Build Goods Interpretation Table Data
+  const goodsInterpretationRows = useMemo((): GoodsInterpretationRow[] => {
+    return complianceItems.map((item): GoodsInterpretationRow => {
+      const firstCitation = item.citations?.[0];
+      
+      // Determine interpretation type based on matchResult
+      let interpretationType: GoodsInterpretationRow["interpretationType"] = "not_supported";
+      const matchResult = item.matchResult;
+      if (matchResult === "Exact") {
+        interpretationType = "exact";
+      } else if (matchResult === "Mapped") {
+        interpretationType = "mapped";
+      } else if (matchResult === "Essential" || item.essentialityAnalysis?.testResult === "PASSED") {
+        interpretationType = "essential";
+      } else if (item.eligibilityStatus?.includes("Eligible")) {
+        // Fallback for eligible items without explicit match result
+        interpretationType = "mapped";
+      }
+      
+      // Determine confidence
+      let confidenceLevel: GoodsInterpretationRow["confidenceLevel"] = "low";
+      const hasCitations = item.citations && item.citations.length > 0;
+      const hasReasoning = item.reasoning && item.reasoning.length > 0;
+      if (hasCitations && hasReasoning && item.matchResult === "Exact") {
+        confidenceLevel = "high";
+      } else if (hasCitations || hasReasoning) {
+        confidenceLevel = "medium";
+      }
+      
+      return {
+        itemNumber: item.itemNumber,
+        invoiceDescription: item.invoiceItem, // Original, NOT translated
+        normalizedName: item.normalizedName,
+        matchedClause: firstCitation ? {
+          documentName: firstCitation.documentName,
+          articleNumber: firstCitation.articleSection,
+          pageNumber: firstCitation.pageNumber,
+          clauseId: firstCitation.clause_id,
+        } : undefined,
+        interpretationType,
+        eligibilityOutcome: item.eligibilityStatus || item.policyCompliance || "Unknown",
+        confidenceLevel,
+        reasoning: item.reasoning?.map(r => r.point).join("; "),
+      };
+    });
+  }, [complianceItems]);
+
+  // Emit Decision Trace events for investor identity and item interpretations
+  useEffect(() => {
+    if (!investorLicenseContextData) return;
+    
+    // Log investor identification
+    if (investorLicenseContextData.investorName) {
+      addEvent(createTraceEvent.info(`Investor identified: ${investorLicenseContextData.investorName}`));
+    }
+    
+    // Log license extraction
+    if (investorLicenseContextData.licenseName) {
+      addEvent(createTraceEvent.info(`License extracted: ${investorLicenseContextData.licenseName}`));
+    }
+    
+    // Log guideline section match
+    if (investorLicenseContextData.matchedGuidelineSection) {
+      addEvent(createTraceEvent.info(
+        `Guideline section matched: ${investorLicenseContextData.matchedGuidelineSection} (p.${investorLicenseContextData.guidelinePageNumber || '?'})`
+      ));
+    }
+
+    // Log item interpretations
+    goodsInterpretationRows.forEach((item) => {
+      if (item.matchedClause) {
+        addEvent(createTraceEvent.info(
+          `Item ${item.itemNumber} interpreted under: ${item.matchedClause.clauseId || item.matchedClause.articleNumber}`
+        ));
+      }
+    });
+  }, [investorLicenseContextData, goodsInterpretationRows, addEvent]);
 
   // Filter officer actions to only include valid items with a type property
   const officerActionsNeeded = (data?.officerActionsNeeded || [])
@@ -801,6 +935,22 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             </Button>
           </div>
         </div>
+
+        {/* Officer Verification Mode Toggle */}
+        <div className="max-w-4xl mx-auto mb-6">
+          <OfficerVerificationToggle
+            isEnabled={isOfficerVerificationMode}
+            onToggle={setIsOfficerVerificationMode}
+          />
+        </div>
+
+        {/* MANDATORY: Investor & License Context Panel */}
+        {investorLicenseContextData && (
+          <InvestorLicenseContextPanel 
+            data={investorLicenseContextData}
+            className="max-w-4xl mx-auto mb-8"
+          />
+        )}
 
         {/* Document Comprehension Gate Status */}
         {documentComprehension && (
@@ -1102,6 +1252,15 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* MANDATORY: Goods Interpretation Table */}
+        {goodsInterpretationRows.length > 0 && (
+          <GoodsInterpretationTable 
+            items={goodsInterpretationRows}
+            isOfficerReviewMode={isOfficerVerificationMode}
+            className="max-w-6xl mx-auto mb-8"
+          />
         )}
 
         {/* Itemized Compliance Table */}

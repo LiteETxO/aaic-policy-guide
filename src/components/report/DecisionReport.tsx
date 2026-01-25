@@ -167,12 +167,120 @@ const ExecutiveSummarySection = ({ summary, total }: { summary: DecisionReportDa
   </section>
 );
 
+// MANDATORY: Investor, License & Interpretation Basis Section
+const InvestorLicenseInterpretationSection = ({ 
+  metadata, 
+  license, 
+  items,
+  policyBasis
+}: { 
+  metadata: DecisionReportData["metadata"];
+  license?: DecisionReportData["licenseSnapshot"];
+  items: DecisionReportData["complianceItems"];
+  policyBasis: DecisionReportData["policyBasis"];
+}) => {
+  // Find first matched policy document for guideline reference
+  const guidelineRef = policyBasis?.[0];
+  
+  return (
+    <section className="page-break-inside-avoid mb-8">
+      <h2 className="text-xl font-bold border-b-2 border-primary pb-2 mb-6">
+        2. የባለሀብት፣ ፈቃድ እና ትርጓሜ መሰረት (Investor, License & Interpretation Basis)
+      </h2>
+      
+      <div className="border-2 border-primary/30 rounded-lg p-4 mb-6 bg-primary/5">
+        <p className="text-xs text-muted-foreground italic mb-4">
+          ይህ ክፍል ግዴታ ነው — ሪፖርት ያለዚህ ክፍል መመንጨት አይችልም (This section is mandatory — report generation blocked without it)
+        </p>
+        
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          {/* Company/Investor Name */}
+          <div className="p-3 border rounded bg-background">
+            <p className="text-xs text-muted-foreground mb-1">የባለሀብቱ ስም (Company / Investor Name)</p>
+            <p className="font-semibold">{metadata.investorName || "አልተገለጸም (Not Specified)"}</p>
+          </div>
+          
+          {/* License Number */}
+          <div className="p-3 border rounded bg-background">
+            <p className="text-xs text-muted-foreground mb-1">የፍቃድ ቁጥር (License Number)</p>
+            <p className="font-mono">{metadata.licenseNumber || license?.licenseNumber || "አልተገለጸም (Not Specified)"}</p>
+          </div>
+        </div>
+        
+        {/* License Name/Activity - Full Width */}
+        <div className="p-3 border rounded bg-background mb-4">
+          <p className="text-xs text-muted-foreground mb-1">የፍቃድ ስም / ተግባር (License Name / Activity) — <span className="italic">ከፈቃድ በቃል (Verbatim from license)</span></p>
+          <p className="font-semibold">{license?.licensedActivity || "አልተገለጸም (Not Specified)"}</p>
+          {license?.licensedActivityAmharic && (
+            <p className="text-sm text-muted-foreground">{license.licensedActivityAmharic}</p>
+          )}
+        </div>
+        
+        {/* License Category */}
+        {license?.sector && (
+          <div className="p-3 border rounded bg-background mb-4">
+            <p className="text-xs text-muted-foreground mb-1">የፍቃድ መደብ (License Category / Type)</p>
+            <p className="font-semibold">{license.sector}</p>
+          </div>
+        )}
+        
+        {/* Guideline Mapping */}
+        <div className="p-3 border rounded bg-background">
+          <p className="text-xs text-muted-foreground mb-1">የፖሊሲ መመሪያ ማዛመጃ (Guideline Mapping)</p>
+          {guidelineRef ? (
+            <div className="space-y-1">
+              <p className="font-semibold">{guidelineRef.documentName}</p>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <span className="text-muted-foreground">አንቀጽ: {guidelineRef.relevantArticles?.[0] || "N/A"}</span>
+                <span className="text-muted-foreground">ገጽ: {guidelineRef.pageNumbers?.[0] || "N/A"}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-destructive">🚫 የመመሪያ ካርታ አልተገኘም (Guideline Mapping Not Found)</p>
+          )}
+        </div>
+      </div>
+      
+      {/* Goods Interpretation Summary Table */}
+      <div className="mb-4">
+        <h4 className="font-semibold mb-3">የዕቃዎች ትርጓሜ ማጠቃለያ (Goods Interpretation Summary)</h4>
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-muted/50">
+              <th className="border p-2 text-left">#</th>
+              <th className="border p-2 text-left">የደረሰኝ መግለጫ (Invoice Description)</th>
+              <th className="border p-2 text-left">ትርጓሜ ዘዴ (Interpretation Method)</th>
+              <th className="border p-2 text-left">ብቁነት (Eligibility)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.slice(0, 10).map((item, i) => (
+              <tr key={i}>
+                <td className="border p-2 font-mono">{item.itemNumber}</td>
+                <td className="border p-2 max-w-[200px] truncate">{item.invoiceItem}</td>
+                <td className="border p-2">{getMatchMethodLabel(item.matchResult)}</td>
+                <td className="border p-2">{getEligibilityLabel(item.eligibilityStatus || item.policyCompliance)}</td>
+              </tr>
+            ))}
+            {items.length > 10 && (
+              <tr>
+                <td colSpan={4} className="border p-2 text-center text-muted-foreground italic">
+                  ... እና {items.length - 10} ተጨማሪ ዕቃዎች (... and {items.length - 10} more items)
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+};
+
 // Documents Reviewed Section
 const DocumentsReviewedSection = ({ documents }: { documents: DecisionReportData["documentsReviewed"] }) => (
   <section className="page-break-inside-avoid mb-8">
     <h2 className="text-xl font-bold border-b-2 border-primary pb-2 mb-6">
-      2. የተገመገሙ ሰነዶች (Documents Reviewed)
-    </h2>
+      3. የተገመገሙ ሰነዶች (Documents Reviewed)</h2>
     
     <table className="w-full border-collapse text-sm">
       <thead>
@@ -207,7 +315,7 @@ const DocumentsReviewedSection = ({ documents }: { documents: DecisionReportData
 const PolicyBasisSection = ({ policies }: { policies: DecisionReportData["policyBasis"] }) => (
   <section className="page-break-inside-avoid mb-8">
     <h2 className="text-xl font-bold border-b-2 border-primary pb-2 mb-6">
-      3. የፖሊሲ መሰረት (Policy Basis)
+      4. የፖሊሲ መሰረት (Policy Basis)
     </h2>
     
     {policies.length === 0 ? (
@@ -248,7 +356,7 @@ const PolicyBasisSection = ({ policies }: { policies: DecisionReportData["policy
 const ItemizedAnalysisSection = ({ items }: { items: ComplianceItem[] }) => (
   <section className="mb-8">
     <h2 className="text-xl font-bold border-b-2 border-primary pb-2 mb-6">
-      4. የዕቃዎች ብቁነት ትንተና ሰንጠረዥ (Itemized Analysis Table)
+      5. የዕቃዎች ብቁነት ትንተና ሰንጠረዥ (Itemized Analysis Table)
     </h2>
     
     {items.map((item, i) => (
@@ -330,7 +438,7 @@ const AnalyticalNotesSection = ({ notes }: { notes?: DecisionReportData["analyti
   return (
     <section className="page-break-inside-avoid mb-8">
       <h2 className="text-xl font-bold border-b-2 border-primary pb-2 mb-6">
-        5. የትንተና ማስታወሻዎች (Analytical Reasoning Notes)
+        6. የትንተና ማስታወሻዎች (Analytical Reasoning Notes)
       </h2>
       
       <div className="space-y-4">
@@ -389,7 +497,7 @@ const IssuesSection = ({ issues }: { issues: ActionItem[] }) => {
   return (
     <section className="page-break-inside-avoid mb-8">
       <h2 className="text-xl font-bold border-b-2 border-primary pb-2 mb-6">
-        6. ጉዳዮች እና ማብራሪያዎች (Issues & Clarifications Required)
+        7. ጉዳዮች እና ማብራሪያዎች (Issues & Clarifications Required)
       </h2>
       
       <div className="space-y-4">
@@ -437,7 +545,7 @@ const ConclusionSection = ({ conclusion, license }: {
 }) => (
   <section className="page-break-inside-avoid mb-8">
     <h2 className="text-xl font-bold border-b-2 border-primary pb-2 mb-6">
-      7. ማጠቃለያ እና የባለስልጣን ቀጣይ እርምጃዎች (Conclusion & Officer Next Steps)
+      8. ማጠቃለያ እና የባለስልጣን ቀጣይ እርምጃዎች (Conclusion & Officer Next Steps)
     </h2>
     
     {conclusion.canProceed.length > 0 && (
@@ -495,6 +603,14 @@ export const DecisionReport = forwardRef<HTMLDivElement, DecisionReportProps>(
           <ExecutiveSummarySection 
             summary={data.executiveSummary} 
             total={data.complianceItems.length} 
+          />
+          
+          {/* MANDATORY: Investor, License & Interpretation Basis */}
+          <InvestorLicenseInterpretationSection
+            metadata={data.metadata}
+            license={data.licenseSnapshot}
+            items={data.complianceItems}
+            policyBasis={data.policyBasis}
           />
           
           <DocumentsReviewedSection documents={data.documentsReviewed} />

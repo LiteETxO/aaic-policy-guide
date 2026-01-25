@@ -5,3 +5,6 @@ export { default as OfficerActions } from "./OfficerActions";
 export { default as LicenseAlignmentCard } from "./LicenseAlignmentCard";
 export { default as ItemCard, type ItemCardData, type ItemCardCitation } from "./ItemCard";
 export { default as GuidelineMappingPanel, type GuidelineMappingData, type GuidelineSection, type AllowedCategory } from "./GuidelineMappingPanel";
+export { default as InvestorLicenseContextPanel, type InvestorLicenseContextData } from "./InvestorLicenseContextPanel";
+export { default as GoodsInterpretationTable, type GoodsInterpretationRow } from "./GoodsInterpretationTable";
+export { default as OfficerVerificationToggle } from "./OfficerVerificationToggle";
