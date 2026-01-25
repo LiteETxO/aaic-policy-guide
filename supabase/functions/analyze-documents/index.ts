@@ -1199,7 +1199,7 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
         { role: "user", content: userPrompt },
       ],
       temperature: 0,  // Set to 0 for deterministic/consistent results
-      max_tokens: 32000,
+      max_completion_tokens: 32000,  // GPT-5 uses max_completion_tokens instead of max_tokens
       // Use tool-calling to force a valid JSON payload (much more reliable than free-form JSON text).
       tools: [
         {
