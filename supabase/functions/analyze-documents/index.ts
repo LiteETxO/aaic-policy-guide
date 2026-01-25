@@ -1216,8 +1216,34 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
                   properties: {
                     gateStatus: { type: "string", enum: ["PASSED", "BLOCKED"] },
                     blockedReason: { type: "string" },
-                    documents: { type: "array" },
-                    policyIndex: { type: "array" },
+                    documents: { 
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          documentName: { type: "string" },
+                          documentType: { type: "string" },
+                          issuingAuthority: { type: "string" },
+                          languagesDetected: { type: "array", items: { type: "string" } },
+                          pageCount: { type: "number" },
+                          ocrConfidence: { type: "string" },
+                          readStatus: { type: "string" }
+                        }
+                      }
+                    },
+                    policyIndex: { 
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          documentName: { type: "string" },
+                          articleSection: { type: "string" },
+                          pageNumber: { type: "number" },
+                          clauseHeading: { type: "string" },
+                          clauseText: { type: "string" }
+                        }
+                      }
+                    },
                     licenseUnderstanding: { type: "object" },
                     invoiceUnderstanding: { type: "object" },
                     analysisPermissionStatement: { type: "string" }
@@ -1257,8 +1283,29 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
                       normalizedName: { type: "string" },
                       eligibilityStatus: { type: "string" },
                       licenseAlignment: { type: "string" },
-                      citations: { type: "array" },
-                      reasoning: { type: "array" }
+                      citations: { 
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            documentName: { type: "string" },
+                            articleSection: { type: "string" },
+                            pageNumber: { type: "number" },
+                            quote: { type: "string" },
+                            relevance: { type: "string" }
+                          }
+                        }
+                      },
+                      reasoning: { 
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            point: { type: "string" },
+                            type: { type: "string" }
+                          }
+                        }
+                      }
                     }
                   }
                 },
