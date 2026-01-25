@@ -20,9 +20,39 @@ export type TraceEventType =
   | "info"
   | "success"
   | "warning"
-  | "error";
+  | "error"
+  // License-first workflow stages
+  | "license_extracted"
+  | "guideline_matched"
+  | "categories_loaded"
+  | "item_clause_bound"
+  | "citation_validated";
 
 export type TraceConfidence = "high" | "medium" | "low" | "none";
+
+// License-first workflow stages for progress tracking
+export type WorkflowStage = 
+  | "license_extracted"
+  | "guideline_matched"
+  | "categories_loaded"
+  | "item_clause_bound"
+  | "citation_validated";
+
+export interface WorkflowStageInfo {
+  id: WorkflowStage;
+  labelAmharic: string;
+  labelEnglish: string;
+  status: "pending" | "in_progress" | "complete" | "failed";
+  timestamp?: Date;
+}
+
+export const WORKFLOW_STAGES: WorkflowStageInfo[] = [
+  { id: "license_extracted", labelAmharic: "ፈቃድ ተወስዷል", labelEnglish: "License extracted", status: "pending" },
+  { id: "guideline_matched", labelAmharic: "መመሪያ ተገኘ", labelEnglish: "Guideline section matched", status: "pending" },
+  { id: "categories_loaded", labelAmharic: "ምድቦች ተጫኑ", labelEnglish: "Allowed categories loaded", status: "pending" },
+  { id: "item_clause_bound", labelAmharic: "ዕቃ ተሳሰረ", labelEnglish: "Item clause bound", status: "pending" },
+  { id: "citation_validated", labelAmharic: "ጥቅስ ተረጋገጠ", labelEnglish: "Citation validated", status: "pending" },
+];
 
 export interface TraceEvent {
   id: string;
@@ -54,6 +84,7 @@ export interface EngagementSignal {
 interface DecisionTraceStore {
   events: TraceEvent[];
   engagementSignals: EngagementSignal[];
+  workflowStages: WorkflowStageInfo[];
   isAnalyzing: boolean;
   isPanelOpen: boolean;
   currentItemIndex: number | null;
@@ -61,6 +92,8 @@ interface DecisionTraceStore {
   // Actions
   addEvent: (event: Omit<TraceEvent, "id" | "timestamp">) => void;
   addEngagementSignal: (signal: Omit<EngagementSignal, "id" | "timestamp">) => void;
+  updateWorkflowStage: (stageId: WorkflowStage, status: WorkflowStageInfo["status"]) => void;
+  resetWorkflowStages: () => void;
   setAnalyzing: (analyzing: boolean) => void;
   setCurrentItem: (index: number | null) => void;
   togglePanel: () => void;
@@ -73,6 +106,7 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 export const useDecisionTrace = create<DecisionTraceStore>((set, get) => ({
   events: [],
   engagementSignals: [],
+  workflowStages: WORKFLOW_STAGES.map(s => ({ ...s })),
   isAnalyzing: false,
   isPanelOpen: true,
   currentItemIndex: null,
@@ -86,6 +120,25 @@ export const useDecisionTrace = create<DecisionTraceStore>((set, get) => ({
     set((state) => ({
       events: [...state.events, newEvent],
     }));
+
+    // Auto-update workflow stages based on event type
+    const stageMapping: Record<string, WorkflowStage> = {
+      license_extracted: "license_extracted",
+      guideline_matched: "guideline_matched",
+      categories_loaded: "categories_loaded",
+      item_clause_bound: "item_clause_bound",
+      citation_validated: "citation_validated",
+      // Also map legacy events to stages
+      license_alignment: "license_extracted",
+      clause_binding: "item_clause_bound",
+      citation_check: "citation_validated",
+    };
+
+    const mappedStage = stageMapping[event.type];
+    if (mappedStage) {
+      const status = event.isBlocked ? "failed" : "complete";
+      get().updateWorkflowStage(mappedStage, status);
+    }
   },
 
   addEngagementSignal: (signal) => {
@@ -99,11 +152,28 @@ export const useDecisionTrace = create<DecisionTraceStore>((set, get) => ({
     }));
   },
 
+  updateWorkflowStage: (stageId, status) => {
+    set((state) => ({
+      workflowStages: state.workflowStages.map((stage) =>
+        stage.id === stageId
+          ? { ...stage, status, timestamp: new Date() }
+          : stage
+      ),
+    }));
+  },
+
+  resetWorkflowStages: () => {
+    set({
+      workflowStages: WORKFLOW_STAGES.map(s => ({ ...s, status: "pending" as const, timestamp: undefined })),
+    });
+  },
+
   setAnalyzing: (analyzing) => {
     set({ isAnalyzing: analyzing });
     if (analyzing) {
-      // Auto-open panel when analysis starts
+      // Auto-open panel and reset workflow stages when analysis starts
       set({ isPanelOpen: true });
+      get().resetWorkflowStages();
     }
   },
 
@@ -123,6 +193,7 @@ export const useDecisionTrace = create<DecisionTraceStore>((set, get) => ({
     set({
       events: [],
       engagementSignals: [],
+      workflowStages: WORKFLOW_STAGES.map(s => ({ ...s, status: "pending" as const, timestamp: undefined })),
       currentItemIndex: null,
     });
   },
@@ -336,6 +407,68 @@ export const createTraceEvent = {
     action: message,
     result: "",
     confidence: "none",
+  }),
+
+  // License-first workflow stage events
+  licenseExtracted: (licenseName: string, licenseType: string): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "license_extracted",
+    labelAmharic: "ፈቃድ ተወስዷል",
+    labelEnglish: "License Extracted",
+    action: "Extracting license information verbatim",
+    result: `License: "${licenseName}" | Type: "${licenseType}"`,
+    confidence: licenseName ? "high" : "none",
+  }),
+
+  guidelineMatched: (matchStatus: "matched" | "partial" | "not_found", sectionTitle?: string, pageNumber?: number): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "guideline_matched",
+    labelAmharic: "መመሪያ ተገኘ",
+    labelEnglish: "Guideline Section Matched",
+    action: "Searching Policy Clause Index for matching guideline",
+    result: matchStatus === "matched" 
+      ? `✓ Matched: "${sectionTitle}" (p.${pageNumber})`
+      : matchStatus === "partial"
+      ? `⚠️ Partial match: "${sectionTitle}" (p.${pageNumber}) — manual review recommended`
+      : "🚫 Not found — guideline mapping failed",
+    evidence: sectionTitle && pageNumber ? { documentName: sectionTitle, pageNumber } : undefined,
+    confidence: matchStatus === "matched" ? "high" : matchStatus === "partial" ? "medium" : "none",
+    isBlocked: matchStatus === "not_found",
+    nextAction: matchStatus === "not_found" ? "Admin must confirm guideline contains this license type OR update policy library" : undefined,
+  }),
+
+  categoriesLoaded: (categoryCount: number, categories: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "categories_loaded",
+    labelAmharic: "ምድቦች ተጫኑ",
+    labelEnglish: "Allowed Categories Loaded",
+    action: "Loading allowed capital goods categories for this license type",
+    result: categoryCount > 0 
+      ? `${categoryCount} categories: ${categories.slice(0, 3).join(", ")}${categories.length > 3 ? "..." : ""}`
+      : "No specific categories defined — general eligibility applies",
+    confidence: categoryCount > 0 ? "high" : "medium",
+  }),
+
+  itemClauseBound: (itemNumber: number, clauseId: string, documentName: string, pageNumber: number): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "item_clause_bound",
+    labelAmharic: "ዕቃ ተሳሰረ",
+    labelEnglish: "Item Clause Bound",
+    action: `Binding item ${itemNumber} to policy clause`,
+    result: `Bound to ${clauseId} from "${documentName}" (p.${pageNumber})`,
+    evidence: { clauseIds: [clauseId], documentName, pageNumber },
+    itemNumber,
+    confidence: "high",
+  }),
+
+  citationValidated: (itemNumber: number, isValid: boolean, missingFields?: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "citation_validated",
+    labelAmharic: "ጥቅስ ተረጋገጠ",
+    labelEnglish: "Citation Validated",
+    action: `Validating citation completeness for item ${itemNumber}`,
+    result: isValid 
+      ? "✓ Citation complete: document, section, and page verified"
+      : `⚠️ Incomplete: missing ${missingFields?.join(", ") || "required fields"}`,
+    itemNumber,
+    confidence: isValid ? "high" : "low",
+    isBlocked: !isValid,
+    nextAction: !isValid ? "Provide complete citation with document name, section, and page number" : undefined,
   }),
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { 
   CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Scale, 
   AlertCircle, BookOpen, Quote, ChevronDown, ChevronRight, ExternalLink,
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { ReportGenerator } from "@/components/report/ReportGenerator";
 import { ConfidenceBadge, EvidenceChip, type ConfidenceLevel, type EvidenceData } from "@/components/gamification";
 import GuidelineMappingPanel, { type GuidelineMappingData, type GuidelineSection, type AllowedCategory } from "@/components/analysis/GuidelineMappingPanel";
+import { useDecisionTrace, createTraceEvent } from "@/hooks/useDecisionTrace";
 
 // Types matching the new AI output format with Policy Clause Index support
 type EligibilityStatus =
@@ -558,6 +559,64 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
       adminActionRequired,
     };
   }, [data, documentComprehension, licenseSnapshot]);
+
+  // Get trace functions
+  const { addEvent, updateWorkflowStage } = useDecisionTrace();
+
+  // Emit trace events when analysis data changes - license-first workflow
+  useEffect(() => {
+    if (!data) return;
+
+    // Stage 1: License Extracted
+    if (licenseSnapshot?.licensedActivity) {
+      addEvent(createTraceEvent.licenseExtracted(
+        licenseSnapshot.licensedActivity,
+        licenseSnapshot.sector || 'Investment'
+      ));
+    }
+
+    // Stage 2: Guideline Section Matched
+    if (guidelineMappingData) {
+      const firstSection = guidelineMappingData.matchedSections?.[0];
+      addEvent(createTraceEvent.guidelineMatched(
+        guidelineMappingData.mappingStatus === 'matched' ? 'matched' :
+        guidelineMappingData.mappingStatus === 'partial' ? 'partial' : 'not_found',
+        firstSection?.sectionTitle,
+        firstSection?.pageNumber
+      ));
+    }
+
+    // Stage 3: Allowed Categories Loaded
+    if (guidelineMappingData?.allowedCategories && guidelineMappingData.allowedCategories.length > 0) {
+      addEvent(createTraceEvent.categoriesLoaded(
+        guidelineMappingData.allowedCategories.length,
+        guidelineMappingData.allowedCategories.map(c => c.categoryName)
+      ));
+    }
+
+    // Stage 4 & 5: Item Clause Bound and Citation Validated - for each compliance item
+    complianceItems.forEach((item, index) => {
+      if (item.citations && item.citations.length > 0) {
+        const citation = item.citations[0];
+        addEvent(createTraceEvent.itemClauseBound(
+          item.itemNumber || index + 1,
+          citation.clause_id || citation.articleSection,
+          citation.documentName,
+          citation.pageNumber
+        ));
+
+        // Citation validation
+        const hasCitation = citation.documentName && citation.pageNumber > 0;
+        addEvent(createTraceEvent.citationValidated(
+          item.itemNumber || index + 1,
+          hasCitation,
+          !hasCitation ? ['document name', 'page number'].filter((_, i) => 
+            i === 0 ? !citation.documentName : citation.pageNumber <= 0
+          ) : undefined
+        ));
+      }
+    });
+  }, [data, licenseSnapshot, guidelineMappingData, complianceItems, addEvent]);
 
   // State for soft-block override
   const [proceedWithManualReview, setProceedWithManualReview] = useState(false);

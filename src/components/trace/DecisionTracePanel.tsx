@@ -29,6 +29,7 @@ import {
   type TraceConfidence,
   type EngagementSignal 
 } from "@/hooks/useDecisionTrace";
+import WorkflowStagesProgress from "./WorkflowStagesProgress";
 
 const eventTypeConfig: Record<TraceEventType, { 
   icon: typeof FileText; 
@@ -55,6 +56,12 @@ const eventTypeConfig: Record<TraceEventType, {
   success: { icon: CheckCircle2, color: "text-success", bgColor: "bg-success/10" },
   warning: { icon: AlertTriangle, color: "text-warning", bgColor: "bg-warning/10" },
   error: { icon: XCircle, color: "text-destructive", bgColor: "bg-destructive/10" },
+  // License-first workflow stages
+  license_extracted: { icon: FileText, color: "text-primary", bgColor: "bg-primary/10" },
+  guideline_matched: { icon: Search, color: "text-amber-500", bgColor: "bg-amber-500/10" },
+  categories_loaded: { icon: GitBranch, color: "text-purple-500", bgColor: "bg-purple-500/10" },
+  item_clause_bound: { icon: Link2, color: "text-teal-500", bgColor: "bg-teal-500/10" },
+  citation_validated: { icon: CheckCircle2, color: "text-success", bgColor: "bg-success/10" },
 };
 
 const confidenceConfig: Record<TraceConfidence, { label: string; color: string }> = {
@@ -189,6 +196,7 @@ const DecisionTracePanel = ({ className }: DecisionTracePanelProps) => {
   const { 
     events, 
     engagementSignals, 
+    workflowStages,
     isAnalyzing, 
     isPanelOpen, 
     togglePanel 
@@ -280,6 +288,9 @@ const DecisionTracePanel = ({ className }: DecisionTracePanelProps) => {
             ))}
           </div>
         )}
+
+        {/* Workflow Stages Progress */}
+        <WorkflowStagesProgress stages={workflowStages} className="mt-1" />
       </CardHeader>
 
       <Separator />
