@@ -35,15 +35,21 @@ const eventTypeConfig: Record<TraceEventType, {
   color: string; 
   bgColor: string;
 }> = {
+  policy_indexed: { icon: FileText, color: "text-primary", bgColor: "bg-primary/10" },
+  annex_verification: { icon: Shield, color: "text-emerald-500", bgColor: "bg-emerald-500/10" },
   document_ingestion: { icon: FileText, color: "text-primary", bgColor: "bg-primary/10" },
   invoice_preservation: { icon: FileText, color: "text-blue-500", bgColor: "bg-blue-500/10" },
   normalization: { icon: GitBranch, color: "text-purple-500", bgColor: "bg-purple-500/10" },
+  clause_query: { icon: Search, color: "text-amber-500", bgColor: "bg-amber-500/10" },
   clause_retrieval: { icon: Search, color: "text-amber-500", bgColor: "bg-amber-500/10" },
   clause_binding: { icon: Link2, color: "text-teal-500", bgColor: "bg-teal-500/10" },
   decision_path: { icon: GitBranch, color: "text-indigo-500", bgColor: "bg-indigo-500/10" },
   license_alignment: { icon: Shield, color: "text-emerald-500", bgColor: "bg-emerald-500/10" },
   essentiality_check: { icon: Scale, color: "text-orange-500", bgColor: "bg-orange-500/10" },
+  citation_check: { icon: CheckCircle2, color: "text-success", bgColor: "bg-success/10" },
+  confidence_score: { icon: Info, color: "text-blue-500", bgColor: "bg-blue-500/10" },
   decision_output: { icon: CheckCircle2, color: "text-success", bgColor: "bg-success/10" },
+  checkpoint_state: { icon: Clock, color: "text-muted-foreground", bgColor: "bg-muted" },
   blocked: { icon: Ban, color: "text-destructive", bgColor: "bg-destructive/10" },
   info: { icon: Info, color: "text-muted-foreground", bgColor: "bg-muted" },
   success: { icon: CheckCircle2, color: "text-success", bgColor: "bg-success/10" },
