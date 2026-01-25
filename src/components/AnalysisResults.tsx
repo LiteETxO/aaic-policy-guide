@@ -193,6 +193,12 @@ interface AnalysisCompleteness {
   itemsDeferredForCitations?: number;
 }
 
+interface GuidelineMappingResult {
+  matchStatus: 'matched' | 'partial' | 'not_found' | 'pending';
+  matchedGuideline?: string;
+  allowedCategories?: string[];
+}
+
 interface AnalysisData {
   documentComprehension?: DocumentComprehension;
   executiveSummary?: {
@@ -218,6 +224,7 @@ interface AnalysisData {
     licenseNumber?: string;
     issueDate?: string;
   };
+  guidelineMapping?: GuidelineMappingResult;
   policyClauseIndex?: PolicyClause[];
   complianceItems?: ComplianceItem[];
   analysisCompleteness?: AnalysisCompleteness;
@@ -474,13 +481,25 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                                 licenseUnderstanding?.licensedActivityAmharic;
     
     // Determine mapping status based on policy clause availability
+    // Handle both camelCase (from AI) and snake_case (from DB) field names
     const hasMatchedClauses = policyClauseIndex.length > 0 || policyIndex.length > 0;
-    const hasCapitalGoodsClauses = policyClauseIndex.some(
-      (c: any) => c.applies_to?.includes('capital_goods') || c.section_type === 'Annex'
-    );
+    const hasCapitalGoodsClauses = policyClauseIndex.some((c: any) => {
+      // Check applies_to array (handles both camelCase and snake_case)
+      const appliesTo = c.applies_to || c.appliesTo || [];
+      const sectionType = c.section_type || c.sectionType || '';
+      return appliesTo.includes('capital_goods') || sectionType === 'Annex';
+    });
+    
+    // Also check if we have a valid license-to-guideline match from the AI response
+    const hasGuidelineMapping = data?.guidelineMapping?.matchStatus === 'matched' ||
+                                data?.guidelineMapping?.matchStatus === 'partial';
     
     let mappingStatus: GuidelineMappingData['mappingStatus'] = 'not_found';
-    if (hasMatchedClauses && hasCapitalGoodsClauses) {
+    
+    // Priority: Use AI-provided guidelineMapping if available
+    if (hasGuidelineMapping) {
+      mappingStatus = data?.guidelineMapping?.matchStatus === 'matched' ? 'matched' : 'partial';
+    } else if (hasMatchedClauses && hasCapitalGoodsClauses) {
       mappingStatus = 'matched';
     } else if (hasMatchedClauses) {
       mappingStatus = 'partial';
@@ -514,15 +533,19 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
       });
     }
     
-    // Build allowed categories from capital goods clauses
+    // Build allowed categories from capital goods clauses (handle both snake_case and camelCase)
     const allowedCategories: AllowedCategory[] = policyClauseIndex
-      .filter((c: any) => c.applies_to?.includes('capital_goods') || c.section_type === 'Annex')
+      .filter((c: any) => {
+        const appliesTo = c.applies_to || c.appliesTo || [];
+        const sectionType = c.section_type || c.sectionType || '';
+        return appliesTo.includes('capital_goods') || sectionType === 'Annex';
+      })
       .slice(0, 10)
       .map((c: any) => ({
-        categoryName: c.clause_heading || c.keywords?.[0] || 'Capital Good Category',
-        categoryNameAmharic: c.clause_heading_amharic,
-        description: c.clause_text?.substring(0, 100) + (c.clause_text?.length > 100 ? '...' : ''),
-        clauseId: c.clause_id,
+        categoryName: c.clause_heading || c.clauseHeading || c.keywords?.[0] || 'Capital Good Category',
+        categoryNameAmharic: c.clause_heading_amharic || c.clauseHeadingAmharic,
+        description: (c.clause_text || c.clauseText)?.substring(0, 100) + ((c.clause_text || c.clauseText)?.length > 100 ? '...' : ''),
+        clauseId: c.clause_id || c.clauseId,
       }));
     
     // Extract conditions and exclusions
