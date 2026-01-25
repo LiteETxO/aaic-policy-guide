@@ -1193,13 +1193,13 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
     // GPT-5 is recommended for complex multi-step reasoning and policy application
     // CRITICAL: GPT-5 must NEVER "invent" clauses - only reason from indexed clauses
     const body: any = {
-      model: "openai/gpt-5",
+      model: "google/gemini-3-flash-preview",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
+      temperature: 0,  // Deterministic results for consistency
       max_completion_tokens: 32000,  // GPT-5 uses max_completion_tokens instead of max_tokens
-      // Note: GPT-5 only supports default temperature (1), cannot set to 0 for deterministic results
       // Use tool-calling to force a valid JSON payload (much more reliable than free-form JSON text).
       tools: [
         {
@@ -1339,7 +1339,7 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
 
     // Create abort controller for timeout (keep under typical client/proxy limits)
     const controller = new AbortController();
-    const timeoutMs = 55_000;
+    const timeoutMs = 90_000;  // Increased for Gemini's processing time with large invoices
     const timeoutId = setTimeout(() => controller.abort("timeout"), timeoutMs);
 
     let response: Response;
