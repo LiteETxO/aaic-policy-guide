@@ -4,3 +4,4 @@ export { default as AIReasoningPanel, type AIReasoningData } from "./AIReasoning
 export { default as OfficerActions } from "./OfficerActions";
 export { default as LicenseAlignmentCard } from "./LicenseAlignmentCard";
 export { default as ItemCard, type ItemCardData, type ItemCardCitation } from "./ItemCard";
+export { default as GuidelineMappingPanel, type GuidelineMappingData, type GuidelineSection, type AllowedCategory } from "./GuidelineMappingPanel";

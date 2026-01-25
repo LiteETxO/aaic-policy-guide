@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Scale, 
   AlertCircle, BookOpen, Quote, ChevronDown, ChevronRight, ExternalLink,
@@ -13,6 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { cn } from "@/lib/utils";
 import { ReportGenerator } from "@/components/report/ReportGenerator";
 import { ConfidenceBadge, EvidenceChip, type ConfidenceLevel, type EvidenceData } from "@/components/gamification";
+import GuidelineMappingPanel, { type GuidelineMappingData, type GuidelineSection, type AllowedCategory } from "@/components/analysis/GuidelineMappingPanel";
 
 // Types matching the new AI output format with Policy Clause Index support
 type EligibilityStatus =
@@ -445,6 +446,122 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
     });
   }, [documentComprehension]);
 
+  // Build Guideline Mapping Data from license snapshot and policy clauses
+  const guidelineMappingData = useMemo((): GuidelineMappingData | null => {
+    const licenseUnderstanding = documentComprehension?.licenseUnderstanding;
+    const policyIndex = documentComprehension?.policyIndex || [];
+    const policyClauseIndex = data?.policyClauseIndex || documentComprehension?.policyClauseIndex || [];
+    
+    // Extract license name from various sources
+    const licenseName = licenseSnapshot?.licensedActivity || 
+                        licenseUnderstanding?.licensedActivity || 
+                        "Investment License";
+    
+    const licenseNameAmharic = licenseSnapshot?.licensedActivityAmharic || 
+                                licenseUnderstanding?.licensedActivityAmharic;
+    
+    // Determine mapping status based on policy clause availability
+    const hasMatchedClauses = policyClauseIndex.length > 0 || policyIndex.length > 0;
+    const hasCapitalGoodsClauses = policyClauseIndex.some(
+      (c: any) => c.applies_to?.includes('capital_goods') || c.section_type === 'Annex'
+    );
+    
+    let mappingStatus: GuidelineMappingData['mappingStatus'] = 'not_found';
+    if (hasMatchedClauses && hasCapitalGoodsClauses) {
+      mappingStatus = 'matched';
+    } else if (hasMatchedClauses) {
+      mappingStatus = 'partial';
+    } else if (documentComprehension?.gateStatus === 'PASSED' && !hasMatchedClauses) {
+      // Gate passed but no clauses found - not_found
+      mappingStatus = 'not_found';
+    } else if (!documentComprehension) {
+      // No document comprehension yet - pending
+      mappingStatus = 'pending';
+    }
+    
+    // Build matched sections from policy index
+    const matchedSections: GuidelineSection[] = policyIndex.slice(0, 5).map((p: any) => ({
+      sectionTitle: p.clauseHeading || p.articleSection || 'Policy Section',
+      sectionTitleAmharic: p.clauseHeadingAmharic,
+      articleNumber: p.articleSection,
+      pageNumber: p.pageNumber || 0,
+      clauseIds: p.clause_id ? [p.clause_id] : undefined,
+    }));
+    
+    // If no policyIndex, try to build from policyClauseIndex
+    if (matchedSections.length === 0 && policyClauseIndex.length > 0) {
+      policyClauseIndex.slice(0, 5).forEach((c: any) => {
+        matchedSections.push({
+          sectionTitle: c.clause_heading || c.section_number || 'Clause',
+          sectionTitleAmharic: c.clause_heading_amharic,
+          articleNumber: c.section_number,
+          pageNumber: c.page_number || 0,
+          clauseIds: [c.clause_id],
+        });
+      });
+    }
+    
+    // Build allowed categories from capital goods clauses
+    const allowedCategories: AllowedCategory[] = policyClauseIndex
+      .filter((c: any) => c.applies_to?.includes('capital_goods') || c.section_type === 'Annex')
+      .slice(0, 10)
+      .map((c: any) => ({
+        categoryName: c.clause_heading || c.keywords?.[0] || 'Capital Good Category',
+        categoryNameAmharic: c.clause_heading_amharic,
+        description: c.clause_text?.substring(0, 100) + (c.clause_text?.length > 100 ? '...' : ''),
+        clauseId: c.clause_id,
+      }));
+    
+    // Extract conditions and exclusions
+    const conditions = policyClauseIndex
+      .filter((c: any) => c.inclusion_type === 'restrictive' || c.inclusion_type === 'procedural')
+      .slice(0, 3)
+      .map((c: any) => c.clause_heading || c.clause_text?.substring(0, 80));
+    
+    const exclusions = policyClauseIndex
+      .filter((c: any) => c.inclusion_type === 'exclusion' || c.applies_to?.includes('exclusion'))
+      .slice(0, 3)
+      .map((c: any) => c.clause_heading || c.clause_text?.substring(0, 80));
+    
+    // Get source document info
+    const sourceDocument = policyClauseIndex[0]?.policy_document_name || 
+                           policyIndex[0]?.documentName ||
+                           'Policy Document';
+    
+    const issuingAuthority = policyClauseIndex[0]?.issuing_authority || 'Ministry of Finance';
+    
+    // Build warning message if needed
+    let warningMessage: string | undefined;
+    let adminActionRequired = false;
+    
+    if (mappingStatus === 'not_found') {
+      warningMessage = 'License type not located in guideline. Cannot determine duty-free eligibility without matching license category.';
+      adminActionRequired = true;
+    } else if (mappingStatus === 'partial') {
+      warningMessage = 'Some guideline sections matched, but capital goods list may be incomplete. Officer review recommended.';
+    }
+    
+    return {
+      licenseNameVerbatim: licenseName,
+      licenseNameAmharic,
+      licenseNumber: licenseSnapshot?.licenseNumber || licenseUnderstanding?.licenseNumber,
+      licensedActivity: licenseSnapshot?.scopeOfOperation,
+      sector: licenseSnapshot?.sector,
+      mappingStatus,
+      matchedSections,
+      allowedCategories,
+      sourceDocument,
+      issuingAuthority,
+      conditions: conditions.filter(Boolean) as string[],
+      exclusions: exclusions.filter(Boolean) as string[],
+      warningMessage,
+      adminActionRequired,
+    };
+  }, [data, documentComprehension, licenseSnapshot]);
+
+  // State for soft-block override
+  const [proceedWithManualReview, setProceedWithManualReview] = useState(false);
+
   // Filter officer actions to only include valid items with a type property
   const officerActionsNeeded = (data?.officerActionsNeeded || [])
     .filter((action): action is ActionItem => action != null && typeof action.type === 'string' && action.type.length > 0);
@@ -764,6 +881,15 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Guideline Mapping Panel - License→Policy Matching */}
+        {guidelineMappingData && (guidelineMappingData.mappingStatus !== 'not_found' || !proceedWithManualReview) && (
+          <GuidelineMappingPanel 
+            data={guidelineMappingData}
+            onProceedAnyway={() => setProceedWithManualReview(true)}
+            className="max-w-4xl mx-auto mb-8"
+          />
         )}
 
         {/* Analysis Completeness Warning */}
