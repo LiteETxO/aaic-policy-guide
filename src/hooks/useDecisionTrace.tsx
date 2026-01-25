@@ -1,15 +1,21 @@
 import { create } from "zustand";
 
 export type TraceEventType = 
+  | "policy_indexed"          // Policy indexed (counts + versions)
+  | "annex_verification"      // Annex II verification gate
   | "document_ingestion"
   | "invoice_preservation"
   | "normalization"
-  | "clause_retrieval"
-  | "clause_binding"
-  | "decision_path"
+  | "clause_query"            // Clause retrieval query terms
+  | "clause_retrieval"        // Clause IDs retrieved
+  | "clause_binding"          // Clause binding success/failure
+  | "decision_path"           // Decision path (Annex match vs Essentiality vs Exclusion)
   | "license_alignment"
   | "essentiality_check"
+  | "citation_check"          // Citation completeness checks
+  | "confidence_score"        // Confidence score
   | "decision_output"
+  | "checkpoint_state"        // Resumable checkpoint state
   | "blocked"
   | "info"
   | "success"
@@ -124,6 +130,28 @@ export const useDecisionTrace = create<DecisionTraceStore>((set, get) => ({
 
 // Helper to create trace events with proper formatting
 export const createTraceEvent = {
+  policyIndexed: (clauseCount: number, documentVersions: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "policy_indexed",
+    labelAmharic: "የፖሊሲ ማውጫ ተፈጥሯል",
+    labelEnglish: "Policy Indexed",
+    action: `Indexed ${clauseCount} clauses from ${documentVersions.length} document(s)`,
+    result: `Documents: ${documentVersions.join(", ")}`,
+    confidence: clauseCount > 0 ? "high" : "none",
+  }),
+
+  annexVerification: (found: boolean, itemCount?: number): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "annex_verification",
+    labelAmharic: "አባሪ ማረጋገጫ",
+    labelEnglish: "Annex II Verification",
+    action: "Checking for Capital Goods List (Annex II)",
+    result: found 
+      ? `✓ Annex II present with ${itemCount || 0} items indexed` 
+      : "🚫 Annex II (Capital Goods List) NOT FOUND — Admin action required",
+    confidence: found ? "high" : "none",
+    isBlocked: !found,
+    nextAction: !found ? "Admin must upload policy documents containing Capital Goods List" : undefined,
+  }),
+
   documentIngestion: (fileName: string, status: "started" | "complete" | "error"): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "document_ingestion",
     labelAmharic: "ሰነድ ማስገባት",
@@ -148,6 +176,16 @@ export const createTraceEvent = {
     labelEnglish: "Item Normalization",
     action: `Normalizing: "${original}"`,
     result: `→ "${normalized}"`,
+    itemNumber,
+    confidence: "medium",
+  }),
+
+  clauseQuery: (itemNumber: number, queryTerms: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "clause_query",
+    labelAmharic: "የፍለጋ መጠይቅ",
+    labelEnglish: "Clause Query Terms",
+    action: `Building search query for item ${itemNumber}`,
+    result: `Query terms: [${queryTerms.map(t => `"${t}"`).join(", ")}]`,
     itemNumber,
     confidence: "medium",
   }),
@@ -211,6 +249,29 @@ export const createTraceEvent = {
     confidence: status === "passed" ? "high" : "medium",
   }),
 
+  citationCheck: (itemNumber: number, complete: boolean, missingFields: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "citation_check",
+    labelAmharic: "ጥቅስ ማረጋገጫ",
+    labelEnglish: "Citation Completeness",
+    action: `Validating citations for item ${itemNumber}`,
+    result: complete 
+      ? "✓ All required citation fields present" 
+      : `⚠️ Missing: ${missingFields.join(", ")}`,
+    itemNumber,
+    confidence: complete ? "high" : "none",
+    isBlocked: !complete,
+  }),
+
+  confidenceScore: (itemNumber: number, score: number, factors: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "confidence_score",
+    labelAmharic: "የእምነት ነጥብ",
+    labelEnglish: "Confidence Score",
+    action: `Calculating confidence for item ${itemNumber}`,
+    result: `Score: ${score}% | Factors: ${factors.join(", ")}`,
+    itemNumber,
+    confidence: score >= 80 ? "high" : score >= 50 ? "medium" : "low",
+  }),
+
   decisionOutput: (itemNumber: number, decision: string, clauseCount: number): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "decision_output",
     labelAmharic: "የውሳኔ ውጤት",
@@ -219,6 +280,15 @@ export const createTraceEvent = {
     result: `${decision} (${clauseCount} citation(s) bound)`,
     itemNumber,
     confidence: clauseCount > 0 ? "high" : "low",
+  }),
+
+  checkpointState: (stage: string, canResume: boolean): Omit<TraceEvent, "id" | "timestamp"> => ({
+    type: "checkpoint_state",
+    labelAmharic: "ማስቀመጫ ነጥብ",
+    labelEnglish: "Checkpoint State",
+    action: `Checkpoint saved at: ${stage}`,
+    result: canResume ? "Resume available if interrupted" : "Progress saved",
+    confidence: "high",
   }),
 
   blocked: (itemNumber: number | undefined, reason: string, nextAction: string): Omit<TraceEvent, "id" | "timestamp"> => ({

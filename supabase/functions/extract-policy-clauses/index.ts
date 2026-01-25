@@ -5,43 +5,74 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const EXTRACTION_PROMPT = `You are an expert legal document parser specializing in Ethiopian investment policy documents. Your task is to extract structured clauses from policy documents.
+const EXTRACTION_PROMPT = `You are GPT-5 operating as a POLICY READER / INDEXER MODEL in a two-model RAG architecture.
 
-## TASK
-Parse the provided policy document text and extract ALL clauses, articles, and items into a structured format.
+Your PURPOSE: Robust long-context parsing, clause extraction, annex parsing, and building a searchable Policy Clause Index.
+You are optimized for structured document parsing and long-context selection.
+
+## CRITICAL RULES (NON-NEGOTIABLE)
+
+1. You are the ONLY source of truth for policy clauses
+2. The Decision Reasoner (GPT-5) can ONLY use clauses YOU extract
+3. If you miss a clause, the system CANNOT make decisions about items covered by that clause
+4. EVERY clause MUST have a page_number — No page number = NOT INDEXABLE = UNUSABLE
+
+## POLICY CLAUSE INDEX SCHEMA (REQUIRED OUTPUT)
+
+Every extracted clause MUST conform to this schema:
+
+PolicyClause:
+- clause_id: unique, stable identifier (format: DIR[number]_[SECTION]_[descriptor])
+- policy_document_name: exact document title
+- policy_version: version string (e.g., "1.0")
+- language: "Amharic" | "English" | "Mixed"
+- section_type: "Article" | "Annex" | "Schedule" | "Item"
+- section_number: precise reference (e.g., "Article 4(2)", "Annex II – Item 3.1")
+- page_number: REQUIRED — integer page number where clause appears
+- clause_text: ≤25 words quote OR tight paraphrase
+- clause_text_amharic: Amharic version if available, null otherwise
+- clause_heading: short heading in English
+- clause_heading_amharic: heading in Amharic if available
+- keywords: array of search terms (include synonyms and related terms)
+- applies_to: array from ["capital_goods", "customs_duty", "income_tax", "essentiality", "exclusion", "general_incentive"]
+- inclusion_type: "enabling" (grants benefits) | "restrictive" (limits) | "exclusion" (denies) | "procedural" (process)
 
 ## EXTRACTION REQUIREMENTS
 
 ### For Articles/Sections:
-- Extract each article with its number, heading (English and Amharic if available), and full text
-- Identify the page number where each article appears (look for "Page X" markers or estimate from structure)
+- Extract each article with its number, heading, and full text
+- Identify the page number where each article appears (MANDATORY)
 - Classify each article's purpose (enabling, restrictive, exclusion, procedural)
 
-### For Annexes/Schedules (CRITICAL - especially Capital Goods Lists):
-- Parse EVERY individual item in annexes
+### For Annexes/Schedules (CRITICAL - Capital Goods Lists):
+- Parse EVERY individual item in annexes — this is the Capital Goods List
 - For Capital Goods Lists, extract EACH category and EACH item within categories
 - Include specific equipment names, machine types, and technical specifications
-- Generate keywords for matching (e.g., "CNC", "lathe", "milling", "manufacturing")
+- Generate comprehensive keywords for matching (e.g., "CNC", "lathe", "milling", "manufacturing")
 
-### Classification Rules:
-- applies_to values: "capital_goods", "customs_duty", "income_tax", "essentiality", "exclusion", "general_incentive"
-- section_type values: "Article", "Annex", "Schedule", "Item"
-- inclusion_type values: "enabling" (grants benefits), "restrictive" (limits benefits), "exclusion" (denies benefits), "procedural" (process requirements)
+### Verification of Annex II (MANDATORY):
+- If the document contains Annex II / Capital Goods List:
+  - Extract EVERY item with category structure
+  - Verify capitalGoodsListPresent = true in summary
+- If Annex II is NOT found:
+  - Set capitalGoodsListPresent = false
+  - This will BLOCK all determinations until admin action
 
 ## OUTPUT FORMAT
+
 Return a JSON object with this exact structure:
 {
   "clauses": [
     {
-      "clause_id": "DIR[number]_ART[X]_[descriptor]",
+      "clause_id": "DIR[number]_[SECTION]_[descriptor]",
       "section_type": "Article|Annex|Schedule|Item",
       "section_number": "Article 16(2)" or "Annex II - Category 1 - Item 3",
       "page_number": 5,
       "clause_heading": "Eligibility Criteria for Duty-Free Import",
       "clause_heading_amharic": "ለቀረጥ ነፃ ማስገባት ብቁነት መስፈርቶች",
-      "clause_text": "Full text of the clause...",
+      "clause_text": "Full text of the clause (≤25 words OR paraphrase)...",
       "clause_text_amharic": "የአማርኛ ጽሑፍ..." or null,
-      "keywords": ["duty-free", "import", "capital goods", "manufacturing"],
+      "keywords": ["duty-free", "import", "capital goods", "manufacturing", "machinery"],
       "applies_to": ["capital_goods", "customs_duty"],
       "inclusion_type": "enabling",
       "issuing_authority": "Ministry of Finance",
@@ -53,20 +84,24 @@ Return a JSON object with this exact structure:
     "total_annexes": 3,
     "total_items": 156,
     "capital_goods_categories": ["Manufacturing Machinery", "ICT Equipment", "Agricultural"],
+    "capitalGoodsListPresent": true,
     "directive_number": "1064/2025",
     "effective_date": "2025-01-01"
   }
 }
 
 ## IMPORTANT RULES
-1. Generate unique clause_id values using the format: DIR[directive_number]_[section]_[descriptor]
-2. For capital goods lists, create a separate clause for EACH specific item (not just categories)
-3. Include bilingual content where available in the source
-4. Estimate page numbers based on document structure if exact markers aren't present
+
+1. Generate unique clause_id values using format: DIR[directive_number]_[section]_[descriptor]
+2. For capital goods lists, create a SEPARATE clause for EACH specific item (not just categories)
+3. Include bilingual content where available
+4. page_number is MANDATORY — estimate from document structure if exact markers aren't present
 5. Extract at least 50-200 clauses from a typical directive document
 6. Keywords should include synonyms and related terms for better matching
+7. NO PAGE NUMBER = NOT INDEXABLE = The clause CANNOT be used for decisions
 
 ## EXAMPLE CAPITAL GOODS ITEM EXTRACTION
+
 If the document contains:
 "Category 1: Manufacturing Machinery
   1. CNC turning machines, lathes, and milling machines
@@ -77,14 +112,18 @@ Extract as:
   "clause_id": "DIR1064_ANNEX2_CAT1_001",
   "section_type": "Item",
   "section_number": "Annex II - Category 1 - Item 1",
+  "page_number": 12,
   "clause_heading": "CNC Turning Machines",
   "clause_text": "CNC turning machines, lathes, and milling machines for manufacturing",
-  "keywords": ["CNC", "turning", "lathe", "milling", "machine", "manufacturing", "machining center"],
+  "keywords": ["CNC", "turning", "lathe", "milling", "machine", "manufacturing", "machining center", "metal cutting"],
   "applies_to": ["capital_goods", "customs_duty"],
   "inclusion_type": "enabling"
 }
 
-Parse the document thoroughly. Missing items means invoice matching will fail.`;
+Parse the document THOROUGHLY. Missing items means invoice matching will FAIL.
+The Decision Reasoner can ONLY work with clauses you extract.`;
+
+
 
 // Initialize Supabase client
 function getSupabaseClient() {
@@ -113,6 +152,8 @@ async function performExtraction(
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
+// Use GPT-4.1 for Policy Reader / Indexer Model
+    // GPT-4.1 supports very long context and is recommended for structured document parsing
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -120,7 +161,7 @@ async function performExtraction(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "openai/gpt-5", // Using GPT-5 for robust long-context parsing and clause extraction
         messages: [
           { role: "system", content: EXTRACTION_PROMPT },
           { 
@@ -134,7 +175,8 @@ Directive Number: ${directiveNumber || "Unknown"}
 ${documentText.substring(0, 120000)}
 --- END DOCUMENT TEXT ---
 
-Return the JSON structure as specified. Be thorough - extract EVERY article and EVERY item from annexes/schedules.`
+Return the JSON structure as specified. Be thorough - extract EVERY article and EVERY item from annexes/schedules.
+CRITICAL: Every clause MUST have a page_number. No page number = unusable for decisions.`
           }
         ],
         temperature: 0,
