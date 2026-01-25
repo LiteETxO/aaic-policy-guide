@@ -18,6 +18,7 @@ import InvestorLicenseContextPanel, { type InvestorLicenseContextData } from "@/
 import GoodsInterpretationTable, { type GoodsInterpretationRow } from "@/components/analysis/GoodsInterpretationTable";
 import OfficerVerificationToggle from "@/components/analysis/OfficerVerificationToggle";
 import { useDecisionTrace, createTraceEvent } from "@/hooks/useDecisionTrace";
+import { supabase } from "@/integrations/supabase/client";
 
 // Types matching the new AI output format with Policy Clause Index support
 type EligibilityStatus =
@@ -335,6 +336,54 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   
   // Get trace functions - must be at top level before any conditional returns
   const { addEvent, updateWorkflowStage } = useDecisionTrace();
+  
+  // State for database policy clauses - fetched directly from DB
+  const [dbPolicyClauses, setDbPolicyClauses] = useState<PolicyClause[]>([]);
+  
+  // Fetch policy clauses from database on mount
+  useEffect(() => {
+    const fetchPolicyClauses = async () => {
+      try {
+        const { data: clauses, error } = await supabase
+          .from('policy_clauses')
+          .select('*')
+          .eq('is_verified', true);
+        
+        if (error) {
+          console.error('Error fetching policy clauses:', error);
+          return;
+        }
+        
+        if (clauses && clauses.length > 0) {
+          // Transform DB format to component format
+          const transformed: PolicyClause[] = clauses.map((c: any) => ({
+            clause_id: c.clause_id,
+            policy_document_name: c.policy_document_name,
+            issuing_authority: c.issuing_authority,
+            policy_version: c.policy_version,
+            language: c.language as "Amharic" | "English" | "Mixed",
+            section_type: c.section_type as ClauseSectionType,
+            section_number: c.section_number,
+            page_number: c.page_number,
+            clause_heading: c.clause_heading,
+            clause_heading_amharic: c.clause_heading_amharic,
+            clause_text: c.clause_text,
+            clause_text_amharic: c.clause_text_amharic,
+            keywords: c.keywords || [],
+            applies_to: c.applies_to || [],
+            inclusion_type: c.inclusion_type as ClauseInclusionType,
+            notes: c.notes,
+          }));
+          setDbPolicyClauses(transformed);
+          console.log(`Loaded ${transformed.length} policy clauses from database`);
+        }
+      } catch (err) {
+        console.error('Failed to fetch policy clauses:', err);
+      }
+    };
+    
+    fetchPolicyClauses();
+  }, []);
 
   const tryRepairJson = (raw: string): AnalysisData | null => {
     try {
@@ -470,7 +519,11 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
   const guidelineMappingData = useMemo((): GuidelineMappingData | null => {
     const licenseUnderstanding = documentComprehension?.licenseUnderstanding;
     const policyIndex = documentComprehension?.policyIndex || [];
-    const policyClauseIndex = data?.policyClauseIndex || documentComprehension?.policyClauseIndex || [];
+    // Use dbPolicyClauses as fallback when AI response doesn't include clauses
+    const policyClauseIndex = data?.policyClauseIndex || 
+                               documentComprehension?.policyClauseIndex || 
+                               dbPolicyClauses || 
+                               [];
     
     // Extract license name from various sources
     const licenseName = licenseSnapshot?.licensedActivity || 
@@ -593,7 +646,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
       warningMessage,
       adminActionRequired,
     };
-  }, [data, documentComprehension, licenseSnapshot]);
+  }, [data, documentComprehension, licenseSnapshot, dbPolicyClauses]);
 
   // Emit trace events when analysis data changes - license-first workflow
   useEffect(() => {
