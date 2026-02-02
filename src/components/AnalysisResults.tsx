@@ -782,10 +782,64 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
         confidenceLevel = "medium";
       }
       
+      // Determine item classification (Spec 4️⃣)
+      let itemClassification: GoodsInterpretationRow["itemClassification"] = "unknown";
+      const lowerName = item.normalizedName?.toLowerCase() || "";
+      const lowerInvoice = item.invoiceItem?.toLowerCase() || "";
+      
+      // Check for tools/consumables/PPE
+      if (lowerName.includes("tool") || lowerName.includes("wrench") || lowerName.includes("screwdriver") ||
+          lowerInvoice.includes("hand tool") || lowerInvoice.includes("consumable")) {
+        itemClassification = "tool_consumable";
+      } else if (lowerName.includes("glove") || lowerName.includes("helmet") || lowerName.includes("safety") ||
+                 lowerName.includes("vest") || lowerName.includes("goggles") || lowerInvoice.includes("ppe")) {
+        itemClassification = "ppe";
+      } else if (item.eligibilityStatus?.includes("Eligible") || item.matchResult === "Exact" || item.matchResult === "Mapped") {
+        // Capital goods that are eligible
+        if (lowerName.includes("part") || lowerName.includes("component") || lowerName.includes("accessory")) {
+          itemClassification = "capital_component";
+        } else {
+          itemClassification = "capital_equipment";
+        }
+      } else if (item.matchResult === "Essential") {
+        itemClassification = "capital_equipment";
+      }
+      
+      // Determine system association (Spec 4️⃣)
+      let systemAssociation: string | undefined;
+      let systemAssociationAmharic: string | undefined;
+      
+      if (lowerName.includes("transform") || lowerName.includes("switch") || lowerName.includes("breaker") || 
+          lowerName.includes("cable") || lowerName.includes("panel") || lowerName.includes("meter")) {
+        systemAssociation = "Power Distribution System";
+        systemAssociationAmharic = "የኃይል ስርጭት ስርዓት";
+      } else if (lowerName.includes("cool") || lowerName.includes("hvac") || lowerName.includes("chiller") ||
+                 lowerName.includes("air condition") || lowerName.includes("refriger")) {
+        systemAssociation = "Cooling / HVAC System";
+        systemAssociationAmharic = "የማቀዝቀዣ / HVAC ስርዓት";
+      } else if (lowerName.includes("server") || lowerName.includes("network") || lowerName.includes("router") ||
+                 lowerName.includes("storage") || lowerName.includes("rack")) {
+        systemAssociation = "IT Infrastructure";
+        systemAssociationAmharic = "የአይቲ መሠረተ ልማት";
+      } else if (lowerName.includes("generator") || lowerName.includes("ups") || lowerName.includes("battery")) {
+        systemAssociation = "Power Generation / Backup";
+        systemAssociationAmharic = "የኃይል ማመንጫ / ማስቀመጫ";
+      } else if (lowerName.includes("fire") || lowerName.includes("suppression") || lowerName.includes("alarm")) {
+        systemAssociation = "Fire Safety System";
+        systemAssociationAmharic = "የእሳት ደህንነት ስርዓት";
+      } else if (lowerName.includes("security") || lowerName.includes("access") || lowerName.includes("cctv") ||
+                 lowerName.includes("camera")) {
+        systemAssociation = "Security / Access Control";
+        systemAssociationAmharic = "የደህንነት / መግቢያ ቁጥጥር";
+      }
+      
       return {
         itemNumber: item.itemNumber,
         invoiceDescription: item.invoiceItem, // Original, NOT translated
         normalizedName: item.normalizedName,
+        systemAssociation,
+        systemAssociationAmharic,
+        itemClassification,
         matchedClause: firstCitation ? {
           documentName: firstCitation.documentName,
           articleNumber: firstCitation.articleSection,

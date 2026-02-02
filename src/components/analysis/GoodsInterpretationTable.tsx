@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { 
   Package, CheckCircle2, AlertTriangle, HelpCircle, XCircle,
-  ChevronDown, ChevronRight, FileText, Gauge
+  ChevronDown, ChevronRight, FileText, Gauge, Zap, Wrench, ShieldCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import {
   CollapsibleContent, 
   CollapsibleTrigger 
 } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 // Types for Goods Interpretation
@@ -25,6 +26,11 @@ export interface GoodsInterpretationRow {
   itemNumber: number;
   invoiceDescription: string; // Original - NOT translated
   normalizedName: string; // For analysis only
+  // NEW: System Association (Spec 4️⃣)
+  systemAssociation?: string; // e.g., "Power Distribution", "Cooling System", "IT Infrastructure"
+  systemAssociationAmharic?: string;
+  // NEW: Item Classification (Spec 4️⃣)
+  itemClassification: "capital_equipment" | "capital_component" | "tool_consumable" | "ppe" | "unknown";
   matchedClause?: {
     documentName: string;
     articleNumber: string;
@@ -67,6 +73,50 @@ const interpretationConfig = {
     color: "text-destructive",
     bgColor: "bg-destructive/10",
     label: "አልተደገፈም (Not Supported)",
+  },
+};
+
+// NEW: Item Classification config (Spec 4️⃣)
+const classificationConfig = {
+  capital_equipment: {
+    label: "ካፒታል መሣሪያ (Capital Equipment)",
+    shortLabel: "Capital",
+    color: "text-success",
+    bgColor: "bg-success/10",
+    borderColor: "border-success/30",
+    qualifies: true,
+  },
+  capital_component: {
+    label: "ካፒታል ክፍል (Capital Component)",
+    shortLabel: "Component",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-500/10",
+    borderColor: "border-emerald-500/30",
+    qualifies: true,
+  },
+  tool_consumable: {
+    label: "መሣሪያ / ፍጆታ (Tool / Consumable)",
+    shortLabel: "Tool",
+    color: "text-destructive",
+    bgColor: "bg-destructive/10",
+    borderColor: "border-destructive/30",
+    qualifies: false,
+  },
+  ppe: {
+    label: "የደህንነት አልባሳት (PPE)",
+    shortLabel: "PPE",
+    color: "text-destructive",
+    bgColor: "bg-destructive/10",
+    borderColor: "border-destructive/30",
+    qualifies: false,
+  },
+  unknown: {
+    label: "አልተመደበም (Unclassified)",
+    shortLabel: "Unknown",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted",
+    borderColor: "border-muted-foreground/30",
+    qualifies: false,
   },
 };
 
@@ -149,41 +199,49 @@ const GoodsInterpretationTable = ({ items, isOfficerReviewMode = false, classNam
             <TableHeader>
               <TableRow className="bg-muted/50">
                 <TableHead className="w-[50px]">#</TableHead>
-                <TableHead className="min-w-[200px]">
+                <TableHead className="min-w-[180px]">
                   <div>
                     <p className="font-semibold">የደረሰኝ መግለጫ</p>
-                    <p className="text-xs font-normal text-muted-foreground">(Invoice Description - Original)</p>
+                    <p className="text-xs font-normal text-muted-foreground">(Invoice - Original)</p>
                   </div>
                 </TableHead>
-                <TableHead className="min-w-[150px]">
+                {/* NEW: System Association Column (Spec 4️⃣) */}
+                <TableHead className="min-w-[130px]">
                   <div>
-                    <p className="font-semibold">የተመደበ ስም</p>
-                    <p className="text-xs font-normal text-muted-foreground">(Normalized - Analysis Only)</p>
+                    <p className="font-semibold">የስርዓት ማህበር</p>
+                    <p className="text-xs font-normal text-muted-foreground">(System Association)</p>
                   </div>
                 </TableHead>
-                <TableHead className="min-w-[200px]">
-                  <div>
-                    <p className="font-semibold">የተገኘ መመሪያ / አባሪ</p>
-                    <p className="text-xs font-normal text-muted-foreground">(Matched Guideline / Annex)</p>
-                  </div>
-                </TableHead>
-                <TableHead className="min-w-[140px]">
-                  <div>
-                    <p className="font-semibold">ትርጓሜ ዓይነት</p>
-                    <p className="text-xs font-normal text-muted-foreground">(Interpretation Type)</p>
-                  </div>
-                </TableHead>
+                {/* NEW: Classification Column (Spec 4️⃣) */}
                 <TableHead className="min-w-[120px]">
                   <div>
-                    <p className="font-semibold">የብቁነት ውጤት</p>
+                    <p className="font-semibold">ምደባ</p>
+                    <p className="text-xs font-normal text-muted-foreground">(Classification)</p>
+                  </div>
+                </TableHead>
+                <TableHead className="min-w-[180px]">
+                  <div>
+                    <p className="font-semibold">የተገኘ መመሪያ</p>
+                    <p className="text-xs font-normal text-muted-foreground">(Matched Guideline)</p>
+                  </div>
+                </TableHead>
+                <TableHead className="min-w-[100px]">
+                  <div>
+                    <p className="font-semibold">ትርጓሜ</p>
+                    <p className="text-xs font-normal text-muted-foreground">(Interpretation)</p>
+                  </div>
+                </TableHead>
+                <TableHead className="min-w-[110px]">
+                  <div>
+                    <p className="font-semibold">ብቁነት</p>
                     <p className="text-xs font-normal text-muted-foreground">(Eligibility)</p>
                   </div>
                 </TableHead>
                 {!isOfficerReviewMode && (
-                  <TableHead className="w-[100px]">
+                  <TableHead className="w-[80px]">
                     <div>
                       <p className="font-semibold">እምነት</p>
-                      <p className="text-xs font-normal text-muted-foreground">(Confidence)</p>
+                      <p className="text-xs font-normal text-muted-foreground">(Conf.)</p>
                     </div>
                   </TableHead>
                 )}
@@ -193,6 +251,7 @@ const GoodsInterpretationTable = ({ items, isOfficerReviewMode = false, classNam
               {items.map((item) => {
                 const interpConfig = interpretationConfig[item.interpretationType];
                 const confConfig = confidenceConfig[item.confidenceLevel];
+                const classConfig = classificationConfig[item.itemClassification];
                 const isExpanded = expandedRows.includes(item.itemNumber);
                 const InterpIcon = interpConfig.icon;
 
@@ -201,7 +260,9 @@ const GoodsInterpretationTable = ({ items, isOfficerReviewMode = false, classNam
                     <TableRow 
                       className={cn(
                         "cursor-pointer hover:bg-muted/50 transition-colors",
-                        isExpanded && "bg-muted/30"
+                        isExpanded && "bg-muted/30",
+                        // Highlight non-qualifying items
+                        !classConfig.qualifies && "bg-destructive/5"
                       )}
                     >
                       <TableCell className="font-mono text-sm">
@@ -216,20 +277,73 @@ const GoodsInterpretationTable = ({ items, isOfficerReviewMode = false, classNam
                           </button>
                         </CollapsibleTrigger>
                       </TableCell>
-                      <TableCell className="text-sm max-w-[250px]">
+                      <TableCell className="text-sm max-w-[200px]">
                         <p className="truncate font-medium" title={item.invoiceDescription}>
                           {item.invoiceDescription}
                         </p>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[180px]">
-                        <p className="truncate" title={item.normalizedName}>
-                          {item.normalizedName}
-                        </p>
+                      {/* NEW: System Association Cell */}
+                      <TableCell className="text-sm">
+                        {item.systemAssociation ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1.5">
+                                  <Zap className="h-3 w-3 text-primary shrink-0" />
+                                  <span className="text-xs truncate max-w-[100px]">
+                                    {item.systemAssociationAmharic || item.systemAssociation}
+                                  </span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-sm font-medium">{item.systemAssociation}</p>
+                                {item.systemAssociationAmharic && (
+                                  <p className="text-xs text-muted-foreground">{item.systemAssociationAmharic}</p>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground italic">—</span>
+                        )}
+                      </TableCell>
+                      {/* NEW: Classification Cell */}
+                      <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-[10px] gap-1",
+                                  classConfig.bgColor, 
+                                  classConfig.color,
+                                  classConfig.borderColor
+                                )}
+                              >
+                                {classConfig.qualifies ? (
+                                  <ShieldCheck className="h-3 w-3" />
+                                ) : (
+                                  <Wrench className="h-3 w-3" />
+                                )}
+                                {classConfig.shortLabel}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-sm">{classConfig.label}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {classConfig.qualifies 
+                                  ? "✅ Qualifies for duty-free incentive" 
+                                  : "❌ Does NOT qualify for duty-free incentive"}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
                       <TableCell className="text-sm">
                         {item.matchedClause ? (
                           <div className="space-y-1">
-                            <p className="text-xs font-medium truncate max-w-[180px]" title={item.matchedClause.documentName}>
+                            <p className="text-xs font-medium truncate max-w-[160px]" title={item.matchedClause.documentName}>
                               {item.matchedClause.documentName}
                             </p>
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -239,16 +353,11 @@ const GoodsInterpretationTable = ({ items, isOfficerReviewMode = false, classNam
                               <span className="text-[10px] text-muted-foreground">
                                 p.{item.matchedClause.pageNumber}
                               </span>
-                              {item.matchedClause.clauseId && (
-                                <Badge variant="secondary" className="text-[10px]">
-                                  {item.matchedClause.clauseId}
-                                </Badge>
-                              )}
                             </div>
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground italic">
-                            አልተገኘም (Not matched)
+                            አልተገኘም
                           </span>
                         )}
                       </TableCell>
@@ -258,11 +367,12 @@ const GoodsInterpretationTable = ({ items, isOfficerReviewMode = false, classNam
                           className={cn("text-[10px] gap-1", interpConfig.bgColor, interpConfig.color)}
                         >
                           <InterpIcon className="h-3 w-3" />
-                          <span className="hidden sm:inline">{interpConfig.label.split(' ')[0]}</span>
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <p className="text-xs font-medium">{item.eligibilityOutcome}</p>
+                        <p className="text-[10px] font-medium truncate max-w-[100px]" title={item.eligibilityOutcome}>
+                          {item.eligibilityOutcome}
+                        </p>
                       </TableCell>
                       {!isOfficerReviewMode && (
                         <TableCell>
@@ -270,7 +380,7 @@ const GoodsInterpretationTable = ({ items, isOfficerReviewMode = false, classNam
                             variant="outline" 
                             className={cn("text-[10px]", confConfig.bgColor, confConfig.color)}
                           >
-                            {confConfig.label}
+                            {confConfig.label.split(' ')[0]}
                           </Badge>
                         </TableCell>
                       )}
@@ -279,7 +389,7 @@ const GoodsInterpretationTable = ({ items, isOfficerReviewMode = false, classNam
                     {/* Expanded Row Details */}
                     <CollapsibleContent asChild>
                       <TableRow className="bg-muted/20 border-0">
-                        <TableCell colSpan={isOfficerReviewMode ? 6 : 7} className="py-3">
+                        <TableCell colSpan={isOfficerReviewMode ? 8 : 9} className="py-3">
                           <div className="pl-8 pr-4 space-y-2">
                             <div className="flex items-start gap-6">
                               <div className="flex-1">

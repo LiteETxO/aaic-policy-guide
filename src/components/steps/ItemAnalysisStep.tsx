@@ -46,6 +46,10 @@ interface AnalysisItem {
     articleSection: string;
     directiveNumber: string;
   };
+  // NEW: Classification & System fields (Spec 4️⃣)
+  itemClassification?: "capital_equipment" | "capital_component" | "tool_consumable" | "ppe" | "unknown";
+  systemAssociation?: string;
+  systemAssociationAmharic?: string;
 }
 
 interface ItemAnalysisStepProps {
@@ -191,6 +195,61 @@ const transformToItemCardData = (item: AnalysisItem, totalItems: number): ItemCa
     item.evidenceCount > 0
   );
 
+  // Derive classification if not provided (Spec 4️⃣)
+  let itemClassification = item.itemClassification;
+  if (!itemClassification) {
+    const lowerName = item.normalizedName?.toLowerCase() || "";
+    const lowerInvoice = item.invoiceItem?.toLowerCase() || "";
+    
+    if (lowerName.includes("tool") || lowerName.includes("wrench") || lowerName.includes("screwdriver") ||
+        lowerInvoice.includes("hand tool") || lowerInvoice.includes("consumable")) {
+      itemClassification = "tool_consumable";
+    } else if (lowerName.includes("glove") || lowerName.includes("helmet") || lowerName.includes("safety") ||
+               lowerName.includes("vest") || lowerName.includes("goggles") || lowerInvoice.includes("ppe")) {
+      itemClassification = "ppe";
+    } else if (item.policyMatch === "Listed" || item.policyMatch === "Mapped") {
+      if (lowerName.includes("part") || lowerName.includes("component") || lowerName.includes("accessory")) {
+        itemClassification = "capital_component";
+      } else {
+        itemClassification = "capital_equipment";
+      }
+    } else {
+      itemClassification = "capital_equipment"; // Default assumption
+    }
+  }
+
+  // Derive system association if not provided (Spec 4️⃣)
+  let systemAssociation = item.systemAssociation;
+  let systemAssociationAmharic = item.systemAssociationAmharic;
+  
+  if (!systemAssociation) {
+    const lowerName = item.normalizedName?.toLowerCase() || "";
+    
+    if (lowerName.includes("transform") || lowerName.includes("switch") || lowerName.includes("breaker") || 
+        lowerName.includes("cable") || lowerName.includes("panel") || lowerName.includes("meter")) {
+      systemAssociation = "Power Distribution System";
+      systemAssociationAmharic = "የኃይል ስርጭት ስርዓት";
+    } else if (lowerName.includes("cool") || lowerName.includes("hvac") || lowerName.includes("chiller") ||
+               lowerName.includes("air condition") || lowerName.includes("refriger")) {
+      systemAssociation = "Cooling / HVAC System";
+      systemAssociationAmharic = "የማቀዝቀዣ / HVAC ስርዓት";
+    } else if (lowerName.includes("server") || lowerName.includes("network") || lowerName.includes("router") ||
+               lowerName.includes("storage") || lowerName.includes("rack")) {
+      systemAssociation = "IT Infrastructure";
+      systemAssociationAmharic = "የአይቲ መሠረተ ልማት";
+    } else if (lowerName.includes("generator") || lowerName.includes("ups") || lowerName.includes("battery")) {
+      systemAssociation = "Power Generation / Backup";
+      systemAssociationAmharic = "የኃይል ማመንጫ / ማስቀመጫ";
+    } else if (lowerName.includes("fire") || lowerName.includes("suppression") || lowerName.includes("alarm")) {
+      systemAssociation = "Fire Safety System";
+      systemAssociationAmharic = "የእሳት ደህንነት ስርዓት";
+    } else if (lowerName.includes("security") || lowerName.includes("access") || lowerName.includes("cctv") ||
+               lowerName.includes("camera")) {
+      systemAssociation = "Security / Access Control";
+      systemAssociationAmharic = "የደህንነት / መግቢያ ቁጥጥር";
+    }
+  }
+
   return {
     itemNumber: item.itemNumber,
     totalItems,
@@ -200,6 +259,9 @@ const transformToItemCardData = (item: AnalysisItem, totalItems: number): ItemCa
     equipmentTypeAmharic: item.equipmentTypeAmharic || "ካፒታል መሣሪያ",
     capitalGoodsCategory: item.capitalGoodsCategory || "Industrial Machinery",
     capitalGoodsCategoryAmharic: item.capitalGoodsCategoryAmharic || "የኢንዱስትሪ ማሽነሪ",
+    itemClassification,
+    systemAssociation,
+    systemAssociationAmharic,
     policyMatchStatus,
     decisionReadiness,
     licenseAlignment: {
