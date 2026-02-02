@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { 
   Package, FileText, Tag, Cpu, ChevronDown, ChevronRight,
-  BookOpen, Building2
+  BookOpen, Building2, ShieldCheck, Wrench, AlertTriangle
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { 
   PolicyMatchBadge, 
@@ -38,6 +39,11 @@ export interface ItemCardData {
   equipmentTypeAmharic?: string;
   capitalGoodsCategory: string;
   capitalGoodsCategoryAmharic?: string;
+  // NEW: Item Classification (Spec 4️⃣)
+  itemClassification?: "capital_equipment" | "capital_component" | "tool_consumable" | "ppe" | "unknown";
+  // NEW: System Association (Spec 4️⃣)
+  systemAssociation?: string;
+  systemAssociationAmharic?: string;
   // B. Policy Match Status
   policyMatchStatus: PolicyMatchStatus;
   // C. Decision Readiness
@@ -60,6 +66,50 @@ export interface ItemCardData {
     directiveNumber: string;
   };
 }
+
+// Classification config for display
+const classificationConfig = {
+  capital_equipment: {
+    label: "ካፒታል መሣሪያ (Capital Equipment)",
+    shortLabel: "Capital",
+    color: "text-success",
+    bgColor: "bg-success/10",
+    borderColor: "border-success/30",
+    qualifies: true,
+  },
+  capital_component: {
+    label: "ካፒታል ክፍል (Capital Component)",
+    shortLabel: "Component",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-500/10",
+    borderColor: "border-emerald-500/30",
+    qualifies: true,
+  },
+  tool_consumable: {
+    label: "መሣሪያ / ፍጆታ (Tool / Consumable)",
+    shortLabel: "Tool/Consumable",
+    color: "text-destructive",
+    bgColor: "bg-destructive/10",
+    borderColor: "border-destructive/30",
+    qualifies: false,
+  },
+  ppe: {
+    label: "የደህንነት አልባሳት (PPE)",
+    shortLabel: "PPE",
+    color: "text-destructive",
+    bgColor: "bg-destructive/10",
+    borderColor: "border-destructive/30",
+    qualifies: false,
+  },
+  unknown: {
+    label: "አልተመደበም (Unclassified)",
+    shortLabel: "Unclassified",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted",
+    borderColor: "border-muted-foreground/30",
+    qualifies: false,
+  },
+};
 
 interface ItemCardProps {
   data: ItemCardData;
@@ -113,19 +163,83 @@ const ItemCard = ({
             <DecisionReadinessBadge status={data.decisionReadiness} />
           </div>
 
-          {/* Row 2: Equipment type and Capital Goods Category */}
+          {/* Row 2: Classification, System Association, and Capital Goods Category (Spec 4️⃣) */}
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="gap-1.5 bg-muted/50">
-              <Cpu className="h-3 w-3" />
-              <span className="font-medium">{data.equipmentTypeAmharic || data.equipmentType}</span>
-              {data.equipmentTypeAmharic && (
-                <span className="text-muted-foreground">({data.equipmentType})</span>
-              )}
-            </Badge>
+            {/* NEW: Item Classification Badge */}
+            {data.itemClassification && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "gap-1.5",
+                        classificationConfig[data.itemClassification].bgColor,
+                        classificationConfig[data.itemClassification].color,
+                        classificationConfig[data.itemClassification].borderColor
+                      )}
+                    >
+                      {classificationConfig[data.itemClassification].qualifies ? (
+                        <ShieldCheck className="h-3 w-3" />
+                      ) : (
+                        <Wrench className="h-3 w-3" />
+                      )}
+                      <span className="font-medium">
+                        {classificationConfig[data.itemClassification].shortLabel}
+                      </span>
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-sm font-medium">{classificationConfig[data.itemClassification].label}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {classificationConfig[data.itemClassification].qualifies 
+                        ? "✅ Qualifies for duty-free incentive" 
+                        : "❌ Does NOT qualify for duty-free incentive"}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            
+            {/* NEW: System Association Badge */}
+            {data.systemAssociation && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="gap-1.5 bg-blue-500/10 text-blue-600 border-blue-500/30">
+                      <Cpu className="h-3 w-3" />
+                      <span className="font-medium">{data.systemAssociationAmharic || data.systemAssociation}</span>
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-sm">የስርዓት ማህበር (System Association)</p>
+                    <p className="text-xs text-muted-foreground">{data.systemAssociation}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            
+            {/* Equipment Type (fallback if no classification) */}
+            {!data.itemClassification && (
+              <Badge variant="outline" className="gap-1.5 bg-muted/50">
+                <Cpu className="h-3 w-3" />
+                <span className="font-medium">{data.equipmentTypeAmharic || data.equipmentType}</span>
+              </Badge>
+            )}
+            
+            {/* Capital Goods Category */}
             <Badge variant="outline" className="gap-1.5 bg-primary/5 text-primary border-primary/30">
               <Package className="h-3 w-3" />
               <span className="font-medium">{data.capitalGoodsCategoryAmharic || data.capitalGoodsCategory}</span>
             </Badge>
+            
+            {/* Non-qualifying warning */}
+            {data.itemClassification && !classificationConfig[data.itemClassification].qualifies && (
+              <Badge variant="destructive" className="gap-1 text-[10px]">
+                <AlertTriangle className="h-3 w-3" />
+                ብቁ አይደለም (Not Eligible)
+              </Badge>
+            )}
           </div>
 
           {/* Row 3: Policy Match Status */}
