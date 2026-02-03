@@ -195,7 +195,7 @@ const transformToItemCardData = (item: AnalysisItem, totalItems: number): ItemCa
     item.evidenceCount > 0
   );
 
-  // Derive classification if not provided (Spec 4️⃣)
+  // Spec 4️⃣: Use AI-provided classification first, fallback to derivation
   let itemClassification = item.itemClassification;
   if (!itemClassification) {
     const lowerName = item.normalizedName?.toLowerCase() || "";
@@ -218,7 +218,7 @@ const transformToItemCardData = (item: AnalysisItem, totalItems: number): ItemCa
     }
   }
 
-  // Derive system association if not provided (Spec 4️⃣)
+  // Spec 4️⃣: Use AI-provided systemAssociation first, fallback to derivation
   let systemAssociation = item.systemAssociation;
   let systemAssociationAmharic = item.systemAssociationAmharic;
   
