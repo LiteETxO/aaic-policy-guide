@@ -313,56 +313,63 @@ MANDATORY INTERPRETATION RULES:
 - Functionally interpreted
 
 ═══════════════════════════════════════════════════════════════════════════════
-🪪 LICENSE → CAPITAL GOODS CATEGORY MAPPING TABLE
+🪪 DYNAMIC LICENSE → CATEGORY MAPPING (POLICY-INDEX-DRIVEN)
 ═══════════════════════════════════════════════════════════════════════════════
 
-For ANY investment license, you MUST:
-1. IDENTIFY the primary licensed activity (exact wording from license)
-2. CLASSIFY the activity nature
-3. MAP to the closest capital-goods category in the list
+🚫 DO NOT use hardcoded sector mappings. Categories MUST be derived from:
+
+1. The Policy Clause Index (provided in user prompt)
+2. The matched guideline section for the specific license type
+3. The actual clause text defining allowed capital goods
+
+DYNAMIC MAPPING PROCEDURE:
+
+STEP A — Extract license activity verbatim from license document
+STEP B — Search Policy Clause Index for clauses with:
+         - Keywords matching the license activity
+         - applies_to containing "capital_goods"
+         - section_type = "Annex" (for capital goods lists)
+STEP C — From matched clauses, extract:
+         - Allowed categories (from clause headings/text)
+         - Example items (from clause content)
+         - Exclusions (from exclusion-type clauses)
+STEP D — Build the allowedCategories array dynamically from Step C
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ LICENSE ACTIVITY → CAPITAL GOODS CATEGORY MAPPING                           │
+│ SCALABILITY RULE (CRITICAL FOR NEW SECTORS)                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ Data Center / ICT Services:                                                 │
-│   → Power infrastructure (transformers, UPS, generators)                   │
-│   → Cooling systems (HVAC, precision cooling, chillers)                    │
-│   → ICT equipment (servers, networking, storage)                           │
-│   → Fire safety and suppression systems                                    │
-│   → Security and access control systems                                    │
-│   → Electrical distribution (switchgear, cables, panels)                   │
+│ This system MUST handle ANY license type without code changes:              │
+│   - Manufacturing, Agriculture, ICT, Healthcare, Energy, Construction      │
+│   - Tourism, Education, Logistics, Mining, Real Estate                     │
+│   - Any future sectors added to policy                                      │
 │                                                                             │
-│ Manufacturing / Production:                                                 │
-│   → Production machinery and equipment                                     │
-│   → Processing and packaging equipment                                     │
-│   → Quality control and testing equipment                                  │
-│   → Material handling equipment                                            │
-│   → Industrial utilities infrastructure                                    │
-│                                                                             │
-│ Energy / Power Generation:                                                  │
-│   → Generation equipment (turbines, generators)                            │
-│   → Transmission equipment (transformers, switchgear)                      │
-│   → Distribution equipment (cables, panels, meters)                        │
-│   → Control and protection systems                                         │
-│                                                                             │
-│ Agriculture / Agro-processing:                                              │
-│   → Farming machinery and implements                                       │
-│   → Irrigation and water management systems                                │
-│   → Processing and storage equipment                                       │
-│   → Cold chain and preservation systems                                    │
-│                                                                             │
-│ Construction / Infrastructure:                                              │
-│   → Heavy machinery (excavators, cranes, loaders)                          │
-│   → Concrete and material processing equipment                             │
-│   → Surveying and measurement equipment                                    │
-│   → Site utilities and temporary power                                     │
-│                                                                             │
-│ Logistics / Warehousing:                                                    │
-│   → Material handling equipment (forklifts, conveyors)                     │
-│   → Storage systems (racking, shelving, cold storage)                      │
-│   → Sorting and packaging systems                                          │
-│   → Fleet management and tracking systems                                  │
+│ The Policy Clause Index is the SINGLE SOURCE OF TRUTH for what categories  │
+│ are allowed for each license type. Never assume or hardcode.               │
 └─────────────────────────────────────────────────────────────────────────────┘
+
+ITEM CLASSIFICATION (MANDATORY FOR EACH ITEM):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ itemClassification MUST be one of:                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ capital_equipment: Integral, installed equipment (eligible)                │
+│ capital_component: Parts/components of capital equipment (eligible)        │
+│ tool_consumable: Hand tools, consumables, spare parts (NOT eligible)       │
+│ ppe: Personal protective equipment (NOT eligible)                          │
+│ unknown: Cannot classify (requires clarification)                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+SYSTEM ASSOCIATION (MANDATORY FOR EACH ITEM):
+Identify which operational system the item belongs to:
+- Power Distribution System
+- Power Generation / Backup
+- Cooling / HVAC System
+- IT Infrastructure
+- Fire Safety System
+- Security / Access Control
+- Production / Processing System
+- Material Handling System
+- Quality Control System
+- [Derive from policy clauses for new sectors]
 
 ⚠️ CRITICAL: If a license is service-oriented but infrastructure-intensive,
    treat it as INFRASTRUCTURE-DEPENDENT, not "non-industrial".
@@ -802,6 +809,9 @@ If the documents array is empty, the output is INVALID.
       "category": "electrical | mechanical | ICT | safety | infrastructure | other",
       "specs": "voltage, capacity, model numbers if available",
       "invoiceRef": "invoice reference",
+      "itemClassification": "capital_equipment | capital_component | tool_consumable | ppe | unknown (REQUIRED)",
+      "systemAssociation": "Power Distribution | Cooling/HVAC | IT Infrastructure | Fire Safety | Security | Production (REQUIRED)",
+      "systemAssociationAmharic": "የኃይል ስርጭት | ማቀዝቀዣ | የአይቲ መሠረተ ልማት (Amharic)",
       "matchResult": "Exact | Mapped | Essential | Not Matched",
       "matchCandidates": [
         {
@@ -815,13 +825,16 @@ If the documents array is empty, the output is INVALID.
       "eligibilityPath": "Path A (Listed) | Path A (Mapped) | Path B (Essential) | Path C (Not Eligible) | Unclear",
       "licenseAlignment": "Aligned | Conditional | Needs Clarification | Not Aligned",
       "licenseEvidence": "quote or paraphrase from license",
+      "referencedClauseIds": ["clause_id_1", "clause_id_2"],
       "citations": [
         {
+          "clause_id": "REQUIRED - from Policy Clause Index",
           "documentName": "policy document name",
           "articleSection": "Article/Annex/Item X.Y.Z",
           "pageNumber": 0,
           "quote": "≤25 word quote in original language (REQUIRED - NO EMPTY CITATIONS)",
-          "relevance": "why this clause applies"
+          "relevance": "why this clause applies",
+          "file_url": "URL to source document (for external linking)"
         }
       ],
       "essentialityAnalysis": {
@@ -829,7 +842,8 @@ If the documents array is empty, the output is INVALID.
         "operationalLink": "direct technical/operational role",
         "capitalNature": "enduring use assessment",
         "noProhibition": "no explicit exclusion found OR explicit exclusion clause cited",
-        "testResult": "PASSED | FAILED | INCONCLUSIVE"
+        "testResult": "PASSED | FAILED | INCONCLUSIVE",
+        "supportingClauseIds": ["clause_ids supporting essentiality determination"]
       },
       "notEligibleJustification": "REQUIRED if status is Not Eligible: explicit exclusion clause with document, article, page, and quote",
       "reasoning": [
@@ -1265,24 +1279,55 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
                   minItems: 1,
                   items: { 
                     type: "object",
-                    required: ["itemNumber", "invoiceItem", "normalizedName", "eligibilityStatus", "licenseAlignment"],
+                    required: ["itemNumber", "invoiceItem", "normalizedName", "eligibilityStatus", "licenseAlignment", "itemClassification"],
                     properties: {
                       itemNumber: { type: "number" },
                       invoiceItem: { type: "string" },
                       normalizedName: { type: "string" },
                       eligibilityStatus: { type: "string" },
                       licenseAlignment: { type: "string" },
+                      // NEW: Spec 4️⃣ - Item Classification (mandatory)
+                      itemClassification: { 
+                        type: "string", 
+                        enum: ["capital_equipment", "capital_component", "tool_consumable", "ppe", "unknown"],
+                        description: "Classification: capital_equipment (integral/installed), capital_component (parts), tool_consumable (tools/consumables), ppe (safety gear), unknown"
+                      },
+                      // NEW: Spec 4️⃣ - System Association (functional grouping)
+                      systemAssociation: { 
+                        type: "string",
+                        description: "Functional system the item belongs to (e.g., Power Distribution, Cooling/HVAC, IT Infrastructure, Fire Safety)"
+                      },
+                      systemAssociationAmharic: { type: "string" },
+                      // NEW: Spec 6️⃣ - Document URL for external linking
+                      documentUrl: {
+                        type: "string",
+                        description: "URL to source policy document for external citation linking"
+                      },
+                      referencedClauseIds: { type: "array", items: { type: "string" } },
                       citations: { 
                         type: "array",
                         items: {
                           type: "object",
                           properties: {
+                            clause_id: { type: "string" },
                             documentName: { type: "string" },
                             articleSection: { type: "string" },
                             pageNumber: { type: "number" },
                             quote: { type: "string" },
-                            relevance: { type: "string" }
+                            relevance: { type: "string" },
+                            file_url: { type: "string", description: "URL to source document for external linking" }
                           }
+                        }
+                      },
+                      essentialityAnalysis: {
+                        type: "object",
+                        properties: {
+                          functionalNecessity: { type: "string" },
+                          operationalLink: { type: "string" },
+                          capitalNature: { type: "string" },
+                          noProhibition: { type: "string" },
+                          testResult: { type: "string", enum: ["PASSED", "FAILED", "INCONCLUSIVE"] },
+                          supportingClauseIds: { type: "array", items: { type: "string" } }
                         }
                       },
                       reasoning: { 
