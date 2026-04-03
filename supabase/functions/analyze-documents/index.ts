@@ -1360,7 +1360,6 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
                 "officerActionsNeeded",
               ],
               additionalProperties: true,
-            },
           },
         },
       ],
