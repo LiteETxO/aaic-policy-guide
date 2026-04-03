@@ -9,34 +9,34 @@ export interface WorkflowStage {
   progress: number;
 }
 
-// Phase A - Policy Import stages (Amharic-first)
+// Phase A - Policy Import stages
 export const POLICY_IMPORT_STAGES: WorkflowStage[] = [
-  { id: "RECEIVED_FILES", label: "ፋይሎችን መቀበል (Receiving Files)", progress: 10 },
-  { id: "OCR_AND_TEXT_EXTRACTION", label: "የፅሁፍ ማውጣት (OCR & Text Extraction)", progress: 25 },
-  { id: "STRUCTURE_DETECTION", label: "መዋቅር መለየት (Structure Detection)", progress: 45 },
-  { id: "POLICY_INDEX_BUILD", label: "የፖሊሲ ማውጫ መገንባት (Policy Index Build)", progress: 60 },
-  { id: "CITATION_MAPPING", label: "ማጣቀሻ ካርታ መዘርጋት (Citation Mapping)", progress: 80 },
-  { id: "VALIDATION_COMPLETE", label: "ማረጋገጫ ተጠናቀቀ (Validation Complete)", progress: 100 },
+  { id: "RECEIVED_FILES", label: "Receiving Files", progress: 10 },
+  { id: "OCR_AND_TEXT_EXTRACTION", label: "OCR & Text Extraction", progress: 25 },
+  { id: "STRUCTURE_DETECTION", label: "Structure Detection", progress: 45 },
+  { id: "POLICY_INDEX_BUILD", label: "Policy Index Build", progress: 60 },
+  { id: "CITATION_MAPPING", label: "Citation Mapping", progress: 80 },
+  { id: "VALIDATION_COMPLETE", label: "Validation Complete", progress: 100 },
 ];
 
-// Phase B - Case Import stages (Amharic-first)
+// Phase B - Case Import stages
 export const CASE_IMPORT_STAGES: WorkflowStage[] = [
-  { id: "RECEIVED_FILES", label: "ፋይሎችን መቀበል (Receiving Files)", progress: 10 },
-  { id: "OCR_AND_TEXT_EXTRACTION", label: "የፅሁፍ ማውጣት (OCR & Text Extraction)", progress: 35 },
-  { id: "FIELD_EXTRACTION", label: "መረጃ ማውጣት (Field Extraction)", progress: 60 },
-  { id: "READABILITY_AND_COMPLETENESS_CHECK", label: "ተነባቢነት ማረጋገጥ (Readability Check)", progress: 85 },
-  { id: "CASE_READY", label: "ጉዳይ ዝግጁ ነው (Case Ready)", progress: 100 },
+  { id: "RECEIVED_FILES", label: "Receiving Files", progress: 10 },
+  { id: "OCR_AND_TEXT_EXTRACTION", label: "OCR & Text Extraction", progress: 35 },
+  { id: "FIELD_EXTRACTION", label: "Field Extraction", progress: 60 },
+  { id: "READABILITY_AND_COMPLETENESS_CHECK", label: "Readability Check", progress: 85 },
+  { id: "CASE_READY", label: "Case Ready", progress: 100 },
 ];
 
-// Phase C - Analysis stages (Amharic-first)
+// Phase C - Analysis stages
 export const ANALYSIS_STAGES: WorkflowStage[] = [
-  { id: "ANALYSIS_START", label: "ትንተና መጀመር (Starting Analysis)", progress: 10 },
-  { id: "ITEM_NORMALIZATION", label: "ዕቃዎችን መደበኛ ማድረግ (Item Normalization)", progress: 25 },
-  { id: "LIST_MATCHING", label: "ከዝርዝር ጋር ማስማማት (List Matching)", progress: 55 },
-  { id: "LICENSE_ALIGNMENT_CHECK", label: "የፍቃድ ማመሳከር (License Alignment Check)", progress: 70 },
-  { id: "ESSENTIALITY_EVALUATION", label: "አስፈላጊነት ግምገማ (Essentiality Evaluation)", progress: 85 },
-  { id: "DECISION_TABLE_AND_CITATIONS_OUTPUT", label: "ውጤቶችን ማዘጋጀት (Generating Results)", progress: 100 },
-  { id: "NETWORK_RETRY_READY", label: "የአይ ግንኙነት ተቋርጧል (Network Retry Ready)", progress: 55 },
+  { id: "ANALYSIS_START", label: "Starting Analysis", progress: 10 },
+  { id: "ITEM_NORMALIZATION", label: "Item Normalization", progress: 25 },
+  { id: "LIST_MATCHING", label: "List Matching", progress: 55 },
+  { id: "LICENSE_ALIGNMENT_CHECK", label: "License Alignment Check", progress: 70 },
+  { id: "ESSENTIALITY_EVALUATION", label: "Essentiality Evaluation", progress: 85 },
+  { id: "DECISION_TABLE_AND_CITATIONS_OUTPUT", label: "Generating Results", progress: 100 },
+  { id: "NETWORK_RETRY_READY", label: "Network Retry Ready", progress: 55 },
 ];
 
 export interface WorkflowStatus {
@@ -147,7 +147,7 @@ export const useWorkflowStatus = create<WorkflowStore>((set, get) => ({
         ...get().status,
         phase: "POLICY_IMPORT",
         stageId: "VALIDATION_COMPLETE",
-        stageLabel: "የፖሊሲ ቤተ-መጽሐፍት ለትንተና ዝግጁ ነው (Policy Library Ready for Analysis)",
+        stageLabel: "Policy Library Ready for Analysis",
         progress: 100,
         state: "COMPLETE",
         policyLibraryReady: true,
@@ -202,7 +202,7 @@ export const useWorkflowStatus = create<WorkflowStore>((set, get) => ({
         ...get().status,
         phase: "CASE_IMPORT",
         stageId: "CASE_READY",
-        stageLabel: "የጉዳይ ፋይል ለትንተና ዝግጁ ነው (Case File Ready for Analysis)",
+        stageLabel: "Case File Ready for Analysis",
         progress: 100,
         state: "COMPLETE",
         caseFilesReady: true,
@@ -230,8 +230,8 @@ export const useWorkflowStatus = create<WorkflowStore>((set, get) => ({
           ...get().status,
           phase: "ANALYSIS",
           state: "BLOCKED",
-          blockingReason: "የፖሊሲ/ጉዳይ ማስገባት አልተጠናቀቀም (Policy/Case Ingestion Incomplete)",
-          nextAction: "መጀመሪያ የፖሊሲ ማስመጣት ደረጃን ያጠናቅቁ (Complete Policy Import Phase First)",
+          blockingReason: "Policy/Case Ingestion Incomplete",
+          nextAction: "Complete Policy Import Phase First",
         },
       });
       return;
@@ -243,8 +243,8 @@ export const useWorkflowStatus = create<WorkflowStore>((set, get) => ({
           ...get().status,
           phase: "ANALYSIS",
           state: "BLOCKED",
-          blockingReason: "የፖሊሲ/ጉዳይ ማስገባት አልተጠናቀቀም (Policy/Case Ingestion Incomplete)",
-          nextAction: "መጀመሪያ የጉዳይ ማስመጣት ደረጃን ያጠናቅቁ (Complete Case Import Phase First)",
+          blockingReason: "Policy/Case Ingestion Incomplete",
+          nextAction: "Complete Case Import Phase First",
         },
       });
       return;
@@ -285,7 +285,7 @@ export const useWorkflowStatus = create<WorkflowStore>((set, get) => ({
         ...get().status,
         phase: "ANALYSIS",
         stageId: "DECISION_TABLE_AND_CITATIONS_OUTPUT",
-        stageLabel: "ትንተና ተጠናቀቀ (Analysis Complete)",
+        stageLabel: "Analysis Complete",
         progress: 100,
         state: "COMPLETE",
       },
@@ -309,7 +309,7 @@ export const useWorkflowStatus = create<WorkflowStore>((set, get) => ({
         ...get().status,
         state: "ERROR",
         blockingReason: reason,
-        nextAction: "እባክዎ እንደገና ይሞክሩ ወይም ድጋፍን ያግኙ (Please Retry or Contact Support)",
+        nextAction: "Please Retry or Contact Support",
       },
     });
   },
@@ -320,10 +320,10 @@ export const useWorkflowStatus = create<WorkflowStore>((set, get) => ({
         ...get().status,
         phase: "ANALYSIS",
         stageId: "NETWORK_RETRY_READY",
-        stageLabel: "የአይ ኔትዎርክ ግንኙነት ተቋርጧል (AI Network Retry Ready)",
+        stageLabel: "AI Network Retry Ready",
         state: "NETWORK_RETRY_READY",
         blockingReason: "AI gateway transient error (502/timeout)",
-        nextAction: "ደግመው ይሞክሩ ወይም ከመጨረሻ ነጥብ ቀጥል (Retry or Resume from Checkpoint)",
+        nextAction: "Retry or Resume from Checkpoint",
         isNetworkError: true,
         networkErrorStage: stage,
       },

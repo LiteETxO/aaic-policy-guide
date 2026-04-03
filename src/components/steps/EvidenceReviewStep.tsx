@@ -43,12 +43,12 @@ interface EvidenceReviewStepProps {
 
 /**
  * Step 4 — Evidence Review (VISUAL PRIORITY)
- * 
+ *
  * MANDATORY POLICY CLAUSE ENFORCEMENT:
  * - Evidence panel must NEVER be empty
  * - If no clause retrieved: show blocked state
  * - If clause found: show full citation details
- * 
+ *
  * When an item card is expanded:
  * - Evidence panel becomes dominant (≥50% width)
  * - Policy clauses are highlighted
@@ -61,16 +61,16 @@ const EvidenceReviewStep = ({
   onItemSelect,
 }: EvidenceReviewStepProps) => {
   const selectedItem = evidenceItems[selectedItemIndex] || evidenceItems[0];
-  
+
   // Determine if item has valid clause binding
   const hasValidClauseBinding = selectedItem && (
     (selectedItem.referencedClauseIds && selectedItem.referencedClauseIds.length > 0) ||
-    (selectedItem.citations && selectedItem.citations.length > 0 && 
+    (selectedItem.citations && selectedItem.citations.length > 0 &&
      selectedItem.citations.some(c => c.clause_id || (c.pageNumber && c.pageNumber > 0)))
   );
-  
-  const isBlocked = selectedItem?.clauseRetrievalBlocked || 
-    (selectedItem && !hasValidClauseBinding && 
+
+  const isBlocked = selectedItem?.clauseRetrievalBlocked ||
+    (selectedItem && !hasValidClauseBinding &&
      selectedItem.eligibilityStatus?.includes("Deferred"));
 
   return (
@@ -82,9 +82,9 @@ const EvidenceReviewStep = ({
             <FileSearch className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold">ማስረጃ ግምገማ (Evidence Review)</h2>
+            <h2 className="text-2xl font-bold">Evidence Review</h2>
             <p className="text-sm text-muted-foreground">
-              ማስረጃዎችን እና ጥቅሶችን ያረጋግጡ ከውሳኔ በፊት
+              Review evidence and citations before making a decision
             </p>
           </div>
         </div>
@@ -95,9 +95,9 @@ const EvidenceReviewStep = ({
         {/* Left: Item selector */}
         <Card className="h-full">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">ዕቃዎች (Items)</CardTitle>
+            <CardTitle className="text-sm">Items</CardTitle>
             <CardDescription className="text-xs">
-              ለመገምገም ዕቃ ይምረጡ
+              Select an item to review
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -105,11 +105,11 @@ const EvidenceReviewStep = ({
               <div className="p-2 space-y-1">
                 {evidenceItems.map((item, index) => {
                   const hasClauseBinding = (item.referencedClauseIds && item.referencedClauseIds.length > 0) ||
-                    (item.citations && item.citations.length > 0 && 
+                    (item.citations && item.citations.length > 0 &&
                      item.citations.some(c => c.clause_id || (c.pageNumber && c.pageNumber > 0)));
-                  const itemBlocked = item.clauseRetrievalBlocked || 
+                  const itemBlocked = item.clauseRetrievalBlocked ||
                     (!hasClauseBinding && item.eligibilityStatus?.includes("Deferred"));
-                  
+
                   return (
                     <button
                       key={item.itemNumber}
@@ -133,7 +133,7 @@ const EvidenceReviewStep = ({
                           "text-xs",
                           itemBlocked ? "text-destructive" : "text-muted-foreground"
                         )}>
-                          {itemBlocked ? "ፖሊሲ አልተገኘም" : `${item.citations.length} ማስረጃዎች`}
+                          {itemBlocked ? "No policy clause found" : `${item.citations.length} citation(s)`}
                         </p>
                       </div>
                       {itemBlocked ? (
@@ -145,8 +145,7 @@ const EvidenceReviewStep = ({
                               </Badge>
                             </TooltipTrigger>
                             <TooltipContent side="left">
-                              <p className="text-sm">የፖሊሲ አንቀጽ አልተገኘም</p>
-                              <p className="text-xs text-muted-foreground">(No policy clause found)</p>
+                              <p className="text-sm">No policy clause found</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -181,12 +180,12 @@ const EvidenceReviewStep = ({
                   ) : (
                     <BookOpen className="h-5 w-5 text-primary" />
                   )}
-                  {selectedItem?.itemName || "ዕቃ ይምረጡ"}
+                  {selectedItem?.itemName || "Select an item"}
                 </CardTitle>
                 <CardDescription>
-                  {isBlocked 
-                    ? "የፖሊሲ አንቀጽ አልተገኘም (No Policy Clause Retrieved)"
-                    : "ማስረጃዎች እና ጥቅሶች (Evidence and Citations)"
+                  {isBlocked
+                    ? "No Policy Clause Retrieved"
+                    : "Evidence and Citations"
                   }
                 </CardDescription>
               </div>
@@ -210,8 +209,7 @@ const EvidenceReviewStep = ({
                 {!selectedItem ? (
                   <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                     <FileSearch className="h-12 w-12 mb-4 opacity-50" />
-                    <p>ዕቃ ይምረጡ ማስረጃዎችን ለማየት</p>
-                    <p className="text-sm">(Select an item to view evidence)</p>
+                    <p>Select an item to view evidence</p>
                   </div>
                 ) : (
                   <>
@@ -219,7 +217,7 @@ const EvidenceReviewStep = ({
                     <div>
                       <h4 className="text-sm font-semibold mb-4 flex items-center gap-2 text-primary">
                         <Quote className="h-4 w-4" />
-                        ፖሊሲ ጥቅሶች (Policy Citations)
+                        Policy Citations
                       </h4>
 
                       {isBlocked ? (
@@ -230,19 +228,16 @@ const EvidenceReviewStep = ({
                           <div className="p-6 rounded-lg bg-destructive/10 border-2 border-destructive flex flex-col items-center justify-center text-center">
                             <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
                             <h4 className="text-lg font-bold text-destructive mb-2">
-                              🚫 ተፈጻሚ የሚሆን የፖሊሲ አንቀጽ አልተገኘም
+                              🚫 No Applicable Policy Clause Retrieved
                             </h4>
-                            <p className="text-sm text-destructive/80 mb-4">
-                              No Applicable Policy Clause Retrieved
-                            </p>
                             <div className="w-full p-4 bg-background/50 rounded border border-destructive/20 text-left">
                               <p className="text-sm text-muted-foreground mb-2">
-                                <strong>ይህ ዕቃ የሚከተለው እስካልተገኘ ድረስ ሊገመገም አይችልም:</strong>
+                                <strong>This item cannot be evaluated until the following are found:</strong>
                               </p>
                               <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-                                <li>ተዛማጅ የፖሊሲ አንቀጽ (Relevant policy article)</li>
-                                <li>ገጽ ቁጥር (Page number)</li>
-                                <li>የአንቀጽ ጽሁፍ (Clause text)</li>
+                                <li>Relevant policy article</li>
+                                <li>Page number</li>
+                                <li>Clause text</li>
                               </ul>
                             </div>
                           </div>
@@ -252,11 +247,10 @@ const EvidenceReviewStep = ({
                               <Info className="h-5 w-5 text-warning shrink-0 mt-0.5" />
                               <div>
                                 <p className="text-sm font-medium text-warning">
-                                  የአስተዳዳሪ ትኩረት ያስፈልጋል
+                                  Admin Attention Required
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  Admin Attention Required: A relevant policy clause must be indexed
-                                  in the Policy Library before this item can be evaluated.
+                                  A relevant policy clause must be indexed in the Policy Library before this item can be evaluated.
                                 </p>
                               </div>
                             </div>
@@ -264,7 +258,7 @@ const EvidenceReviewStep = ({
 
                           <div className="p-3 rounded bg-muted/50 border">
                             <p className="text-xs font-medium text-muted-foreground mb-1">
-                              የውሳኔ ሁኔታ (Decision Status)
+                              Decision Status
                             </p>
                             <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
                               ⚠️ Decision Deferred — Policy Clause Not Found
@@ -276,10 +270,10 @@ const EvidenceReviewStep = ({
                           <AlertCircle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
                           <div>
                             <p className="text-sm font-medium text-warning">
-                              ማስረጃ አልተገኘም (No Evidence Found)
+                              No Evidence Found
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              ለዚህ ዕቃ ምንም የፖሊሲ ጥቅስ አልተገኘም።
+                              No policy citation was found for this item.
                             </p>
                           </div>
                         </div>
@@ -339,15 +333,15 @@ const EvidenceReviewStep = ({
                     {selectedItem.essentialityAnalysis && (
                       <div className="pt-4 border-t">
                         <h4 className="text-sm font-semibold mb-4 text-primary">
-                          🧠 የአስፈላጊነት ትንተና (Essentiality Analysis)
+                          🧠 Essentiality Analysis
                         </h4>
 
                         <div className="grid gap-3">
                           {[
-                            { key: "functionalNecessity", label: "ተግባራዊ አስፈላጊነት", labelEn: "Functional Necessity" },
-                            { key: "operationalLink", label: "ተግባራዊ ትስስር", labelEn: "Operational Link" },
-                            { key: "capitalNature", label: "የካፒታል ባህሪ", labelEn: "Capital Nature" },
-                            { key: "noProhibition", label: "እገዳ የለም", labelEn: "No Prohibition" },
+                            { key: "functionalNecessity", label: "Functional Necessity" },
+                            { key: "operationalLink", label: "Operational Link" },
+                            { key: "capitalNature", label: "Capital Nature" },
+                            { key: "noProhibition", label: "No Prohibition" },
                           ].map((field) => {
                             const value = selectedItem.essentialityAnalysis?.[field.key as keyof EssentialityAnalysis];
                             if (!value) return null;
@@ -358,7 +352,7 @@ const EvidenceReviewStep = ({
                                 className="p-3 rounded-lg bg-muted/30 border"
                               >
                                 <p className="text-xs font-semibold text-muted-foreground mb-1">
-                                  {field.label} ({field.labelEn})
+                                  {field.label}
                                 </p>
                                 <p className="text-sm">{value}</p>
                               </div>

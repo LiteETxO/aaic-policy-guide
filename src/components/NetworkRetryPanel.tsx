@@ -73,13 +73,13 @@ export function NetworkRetryPanel({
           </div>
           <div className="flex-1">
             <CardTitle className="text-lg text-warning flex items-center gap-2">
-              {error.messageAmharic}
+              {error.message}
               <Badge variant="outline" className="ml-2 text-xs font-normal">
                 {error.category === "TRANSIENT_NETWORK" ? "Temporary" : "Error"}
               </Badge>
             </CardTitle>
             <CardDescription className="mt-1">
-              (Temporary AI Connection Issue)
+              Temporary AI connection issue — your progress has been saved.
             </CardDescription>
           </div>
         </div>
@@ -88,11 +88,8 @@ export function NetworkRetryPanel({
       <CardContent className="space-y-4">
         {/* Explanation */}
         <div className="text-sm text-muted-foreground bg-background/60 rounded-lg p-3 border">
-          <p className="mb-2">
-            <strong>ይህ ጊዜያዊ ነው — የፖሊሲ ውሳኔ አይደለም</strong>
-          </p>
-          <p>
-            This is a temporary connection issue, not a policy decision. Your analysis progress has been saved.
+          <p className="text-sm">
+            This is a temporary connection issue, not a policy decision. Your analysis progress has been saved and can be resumed.
           </p>
         </div>
         
@@ -152,7 +149,7 @@ export function NetworkRetryPanel({
             ) : (
               <>
                 <RefreshCw className="h-4 w-4" />
-                ደግመው ይሞክሩ (Retry Analysis)
+                Retry Analysis
               </>
             )}
           </Button>
@@ -165,7 +162,7 @@ export function NetworkRetryPanel({
               className="flex-1 gap-2"
             >
               <PlayCircle className="h-4 w-4" />
-              ከመጨረሻ ነጥብ ቀጥል (Resume)
+              Resume from Checkpoint
             </Button>
           )}
         </div>

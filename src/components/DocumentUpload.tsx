@@ -2,6 +2,7 @@ import { useState, useEffect, type ChangeEvent, type DragEvent, type ElementType
 import { Upload, FileText, Receipt, CheckCircle2, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { usePolicyDocuments } from "@/hooks/usePolicyDocuments";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,7 +16,6 @@ import { NetworkRetryPanel } from "@/components/NetworkRetryPanel";
 interface UploadZone {
   id: string;
   title: string;
-  titleAmharic: string;
   description: string;
   icon: ElementType;
   accept: string;
@@ -37,7 +37,6 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
     {
       id: "license",
       title: "Investment License",
-      titleAmharic: "የኢንቨስትመንት ፈቃድ",
       description: "Upload the official investment license document",
       icon: FileText,
       accept: ".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt",
@@ -46,7 +45,6 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
     {
       id: "invoice",
       title: "Commercial Invoice(s)",
-      titleAmharic: "የንግድ ደረሰኞች",
       description: "Upload invoices for capital goods",
       icon: Receipt,
       accept: ".pdf,.xls,.xlsx,.jpg,.jpeg,.png,.txt",
@@ -56,6 +54,8 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
 
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [networkError, setNetworkError] = useState<ClassifiedError | null>(null);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisStepLabel, setAnalysisStepLabel] = useState("");
 
   const {
     status,
@@ -340,6 +340,8 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
     setIsAnalyzing(true);
     setAnalyzing(true);
     startAnalysis();
+    setAnalysisProgress(5);
+    setAnalysisStepLabel("Uploading documents...");
 
     const licenseZone = uploadZones.find(z => z.id === "license");
     const invoiceZone = uploadZones.find(z => z.id === "invoice");
@@ -367,6 +369,8 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
         addTechnicalLog("Resuming from checkpoint with existing document data");
       }
 
+      setAnalysisProgress(20);
+      setAnalysisStepLabel("Parsing documents...");
       updateAnalysisStage("ITEM_NORMALIZATION");
       addEvent(createTraceEvent.info("Starting item normalization..."));
 
@@ -402,6 +406,8 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
         policyDocumentIds: policyDocuments?.map(d => d.id),
       });
 
+      setAnalysisProgress(40);
+      setAnalysisStepLabel("Retrieving policy clauses...");
       updateAnalysisStage("LIST_MATCHING");
       addEvent(createTraceEvent.info("Querying PolicyClauseIndex for matching clauses..."));
 
@@ -416,6 +422,8 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
         lastAICallTimestamp: Date.now(),
       });
       
+      setAnalysisProgress(60);
+      setAnalysisStepLabel("Running AI analysis...");
       addTechnicalLog("Checkpoint saved before AI gateway call");
 
       // Call the edge function with timeout handling
@@ -492,6 +500,8 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
       
       addTechnicalLog(`Analysis complete. Clauses retrieved: ${data?.clausesRetrieved || 0}`);
 
+      setAnalysisProgress(90);
+      setAnalysisStepLabel("Generating report...");
       updateAnalysisStage("LICENSE_ALIGNMENT_CHECK");
       addEvent(createTraceEvent.info("Checking license alignment for each item..."));
 
@@ -528,7 +538,9 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
         
         // Clear checkpoint on success
         clearCheckpoint();
-        
+        setAnalysisProgress(100);
+        setAnalysisStepLabel("Complete");
+
         toast.success("Analysis complete!");
         onAnalyze(data.analysis);
       } else {
@@ -560,12 +572,10 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
     setCheckpointNetworkError(classifiedError);
     setNetworkRetryReady(classifiedError.stage);
     
-    addEvent(createTraceEvent.warning(
-      `${classifiedError.messageAmharic} (${classifiedError.message})`
-    ));
+    addEvent(createTraceEvent.warning(classifiedError.message));
     addTechnicalLog(`Network error: ${classifiedError.technicalDetails}`);
     
-    toast.error(classifiedError.messageAmharic, {
+    toast.error(classifiedError.message, {
       description: "Your progress has been saved. Click Retry to continue.",
       duration: 10000,
     });
@@ -837,6 +847,15 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
               "Analyze Documents"
             )}
           </Button>
+
+          {isAnalyzing && (
+            <div className="space-y-1.5 pt-1">
+              <Progress value={analysisProgress} className="h-2 rounded-full transition-all duration-500" />
+              <p className="text-xs text-center text-muted-foreground">
+                {analysisStepLabel} ({analysisProgress}%)
+              </p>
+            </div>
+          )}
           {!hasRequiredFiles && (
             <p className="text-xs text-center text-muted-foreground">
               Upload both the investment license and invoice to proceed

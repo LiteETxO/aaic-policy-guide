@@ -72,7 +72,7 @@ const statusConfig = {
     color: "text-success",
     bgColor: "bg-success/10",
     borderColor: "border-success/30",
-    label: "✅ ተዛምዷል (Matched)",
+    label: "✅ Matched",
     description: "License type successfully matched to guideline section",
   },
   partial: {
@@ -80,15 +80,15 @@ const statusConfig = {
     color: "text-warning",
     bgColor: "bg-warning/10",
     borderColor: "border-warning/30",
-    label: "⚠️ ከፊል ግጥጥም (Partial Match)",
-    description: "Some sections matched, but review recommended",
+    label: "⚠️ Partial Match",
+    description: "Some sections matched — officer review recommended",
   },
   not_found: {
     icon: AlertOctagon,
     color: "text-destructive",
     bgColor: "bg-destructive/10",
     borderColor: "border-destructive/30",
-    label: "🚫 አልተገኘም (Not Found)",
+    label: "🚫 Not Found",
     description: "License type not located in policy guideline",
   },
   pending: {
@@ -96,7 +96,7 @@ const statusConfig = {
     color: "text-muted-foreground",
     bgColor: "bg-muted",
     borderColor: "border-muted-foreground/30",
-    label: "⏳ በመፈተሽ ላይ (Checking)",
+    label: "⏳ Checking",
     description: "Searching policy documents for matching sections...",
   },
 };
@@ -124,7 +124,7 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
             </div>
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
-                <span>የመመሪያ ካርታ (Guideline Mapping)</span>
+                <span>Guideline Mapping</span>
                 <Badge variant="outline" className={cn("text-xs", config.bgColor, config.color)}>
                   {config.label}
                 </Badge>
@@ -143,27 +143,24 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
         <div className={cn("p-4 rounded-lg border", config.bgColor, config.borderColor)}>
           <div className="flex items-center gap-2 mb-3">
             <FileText className="h-4 w-4 text-primary" />
-            <h4 className="text-sm font-semibold">የፈቃድ መረጃ (License Information)</h4>
+            <h4 className="text-sm font-semibold">License Information</h4>
           </div>
           
           <div className="space-y-2">
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               <div>
-                <p className="text-xs text-muted-foreground">ፈቃድ ዓይነት (License Type)</p>
+                <p className="text-xs text-muted-foreground">License Type</p>
                 <p className="text-sm font-medium">{data.licenseNameVerbatim}</p>
-                {data.licenseNameAmharic && (
-                  <p className="text-xs text-muted-foreground">{data.licenseNameAmharic}</p>
-                )}
               </div>
               {data.licenseNumber && (
                 <div>
-                  <p className="text-xs text-muted-foreground">ፈቃድ ቁጥር (License #)</p>
+                  <p className="text-xs text-muted-foreground">License #</p>
                   <p className="text-sm font-medium">{data.licenseNumber}</p>
                 </div>
               )}
               {data.sector && (
                 <div>
-                  <p className="text-xs text-muted-foreground">ዘርፍ (Sector)</p>
+                  <p className="text-xs text-muted-foreground">Sector</p>
                   <Badge variant="secondary" className="text-xs">{data.sector}</Badge>
                 </div>
               )}
@@ -171,11 +168,8 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
             
             {data.licensedActivity && (
               <div className="pt-2 border-t border-border/50">
-                <p className="text-xs text-muted-foreground mb-1">የተፈቀደ እንቅስቃሴ (Licensed Activity)</p>
+                <p className="text-xs text-muted-foreground mb-1">Licensed Activity</p>
                 <p className="text-sm">{data.licensedActivity}</p>
-                {data.licensedActivityAmharic && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{data.licensedActivityAmharic}</p>
-                )}
               </div>
             )}
           </div>
@@ -186,9 +180,7 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
           <div className="p-4 rounded-lg bg-success/5 border border-success/20">
             <div className="flex items-center gap-2 mb-3">
               <BookOpen className="h-4 w-4 text-success" />
-              <h4 className="text-sm font-semibold text-success">
-                የተዛመዱ የመመሪያ ክፍሎች (Matched Guideline Sections)
-              </h4>
+              <h4 className="text-sm font-semibold text-success">Matched Guideline Sections</h4>
             </div>
             
             <div className="space-y-2">
@@ -197,18 +189,13 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
                   <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm font-medium">{section.sectionTitle}</p>
-                    {section.sectionTitleAmharic && (
-                      <p className="text-xs text-muted-foreground">{section.sectionTitleAmharic}</p>
-                    )}
                     <div className="flex items-center gap-2 mt-1">
                       {section.articleNumber && (
                         <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/30">
                           {section.articleNumber}
                         </Badge>
                       )}
-                      <span className="text-xs text-muted-foreground">
-                        ገጽ {section.pageNumber} (Page {section.pageNumber})
-                      </span>
+                      <span className="text-xs text-muted-foreground">p. {section.pageNumber}</span>
                     </div>
                   </div>
                 </div>
@@ -217,7 +204,7 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
               {data.sourceDocument && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border/50">
                   <Building2 className="h-3 w-3" />
-                  <span>ምንጭ: {data.sourceDocument}</span>
+                  <span>Source: {data.sourceDocument}</span>
                   {data.issuingAuthority && <span>• {data.issuingAuthority}</span>}
                 </div>
               )}
@@ -237,9 +224,6 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
                   <ClipboardList className="h-4 w-4 text-primary" />
                   <div>
                     <p className="text-sm font-semibold">
-                      ለዚህ ፈቃድ የተፈቀዱ ካፒታል እቃዎች ምድቦች
-                    </p>
-                    <p className="text-xs text-muted-foreground">
                       Allowed Capital Goods Categories ({data.allowedCategories.length})
                     </p>
                   </div>
@@ -257,9 +241,6 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
                 {data.allowedCategories.map((category, idx) => (
                   <div key={idx} className="p-3 rounded-lg bg-muted/50 border border-border">
                     <p className="text-sm font-medium">{category.categoryName}</p>
-                    {category.categoryNameAmharic && (
-                      <p className="text-xs text-muted-foreground">{category.categoryNameAmharic}</p>
-                    )}
                     {category.description && (
                       <p className="text-xs text-muted-foreground mt-1">{category.description}</p>
                     )}
@@ -280,7 +261,7 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
           <div className="p-3 rounded-lg bg-warning/5 border border-warning/20">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="h-4 w-4 text-warning" />
-              <h5 className="text-sm font-semibold text-warning">ቅድመ ሁኔታዎች (Conditions)</h5>
+              <h5 className="text-sm font-semibold text-warning">Conditions</h5>
             </div>
             <ul className="space-y-1">
               {data.conditions.map((condition, idx) => (
@@ -298,7 +279,7 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
           <div className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
             <div className="flex items-center gap-2 mb-2">
               <AlertOctagon className="h-4 w-4 text-destructive" />
-              <h5 className="text-sm font-semibold text-destructive">ከቀረጥ ነፃ ውጭ (Exclusions)</h5>
+              <h5 className="text-sm font-semibold text-destructive">Exclusions</h5>
             </div>
             <ul className="space-y-1">
               {data.exclusions.map((exclusion, idx) => (
@@ -327,22 +308,13 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
                   "text-sm font-semibold mb-1",
                   isBlocked ? "text-destructive" : "text-warning"
                 )}>
-                  {isBlocked 
-                    ? "🚫 የመመሪያ ካርታ አልተሳካም — ማስጠንቀቂያ" 
-                    : "⚠️ ከፊል ግጥጥም — የባለስልጣን ግምገማ ይመከራል"
-                  }
-                </h5>
-                <p className="text-xs text-muted-foreground mb-1">
-                  {isBlocked 
-                    ? "Guideline Mapping Failed — Caution Advised" 
+                  {isBlocked
+                    ? "Guideline Mapping Failed — Caution Advised"
                     : "Partial Match — Officer Review Recommended"
                   }
-                </p>
+                </h5>
                 {data.warningMessage && (
                   <p className="text-sm text-foreground mt-2">{data.warningMessage}</p>
-                )}
-                {data.warningMessageAmharic && (
-                  <p className="text-xs text-muted-foreground">{data.warningMessageAmharic}</p>
                 )}
                 
                 {/* Soft block: allow proceeding with warning */}
@@ -358,7 +330,7 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
                       className="gap-2 border-warning text-warning hover:bg-warning/10"
                     >
                       <ExternalLink className="h-3 w-3" />
-                      በእጅ ግምገማ ቀጥል (Proceed with Manual Review)
+                      Proceed with Manual Review
                     </Button>
                   </div>
                 )}
@@ -372,9 +344,7 @@ const GuidelineMappingPanel = ({ data, onProceedAnyway, className }: GuidelineMa
           <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30">
             <div className="flex items-center gap-2">
               <AlertOctagon className="h-4 w-4 text-destructive" />
-              <p className="text-sm font-medium text-destructive">
-                የአስተዳዳሪ እርምጃ ያስፈልጋል (Admin Action Required)
-              </p>
+              <p className="text-sm font-medium text-destructive">Admin Action Required</p>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Admin must confirm guideline contains this license type OR update policy library.

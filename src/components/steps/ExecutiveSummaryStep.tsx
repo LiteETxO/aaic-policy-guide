@@ -40,13 +40,11 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
             <BarChart3 className="h-5 w-5 text-muted-foreground" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold">ቅድመ ማጠቃለያ (ምክር)</h2>
-            <p className="text-sm text-muted-foreground">
-              Preliminary Executive Summary (Advisory)
-            </p>
+            <h2 className="text-2xl font-bold">Preliminary Executive Summary</h2>
+            <p className="text-sm text-muted-foreground">Advisory only — review evidence before relying on this section</p>
           </div>
           <Badge variant="outline" className="text-xs bg-muted">
-            ምክር ብቻ (Advisory Only)
+            Advisory Only
           </Badge>
         </div>
       </div>
@@ -55,11 +53,7 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
       <Alert className="border-blue-500/30 bg-blue-500/5">
         <Info className="h-4 w-4 text-blue-500" />
         <AlertDescription className="text-sm">
-          <span className="font-medium">ℹ️ ይህ ማጠቃለያ ከንጥል-ደረጃ ትንተና በኋላ ተፈጥሯል።</span>
-          <br />
-          <span className="text-muted-foreground text-xs">
-            (This summary is generated after item-level analysis. Please review evidence before relying on this section.)
-          </span>
+          <span className="text-sm">This summary is generated after item-level analysis. Please review evidence before relying on this section.</span>
         </AlertDescription>
       </Alert>
 
@@ -69,12 +63,11 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <Shield className="h-5 w-5 text-muted-foreground" />
-              የትንተና ጥራት (Analysis Quality)
+              Analysis Quality
             </CardTitle>
             <ConfidenceBadge level={summary.overallConfidence} size="md" />
           </div>
-          <CardDescription>
-            የማስረጃ ሙሉነት እና የትንተና ጥራት (Evidence completeness and analysis quality)
+          <CardDescription>Evidence completeness and analysis quality
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -98,10 +91,8 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
       {/* Summary Counts - NEUTRAL COLORS */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">የትንተና ስታቲስቲክስ (Analysis Statistics)</CardTitle>
-          <CardDescription>
-            ውጤቶች በምድብ (Results by category)
-          </CardDescription>
+          <CardTitle className="text-lg">Analysis Statistics</CardTitle>
+          <CardDescription>Results by category</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid sm:grid-cols-3 gap-4">
@@ -111,8 +102,7 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
                 <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
               </div>
               <p className="text-3xl font-bold text-foreground mb-1">{summary.eligibleCount}</p>
-              <p className="text-xs text-muted-foreground">በማስረጃ የተደገፈ</p>
-              <p className="text-xs text-muted-foreground">(Supported by Evidence)</p>
+              <p className="text-xs text-muted-foreground">Supported by Evidence</p>
             </div>
 
             {/* Needs Review - Neutral */}
@@ -121,8 +111,7 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
                 <HelpCircle className="h-5 w-5 text-muted-foreground" />
               </div>
               <p className="text-3xl font-bold text-foreground mb-1">{summary.clarificationCount}</p>
-              <p className="text-xs text-muted-foreground">ማብራሪያ ያስፈልጋል</p>
-              <p className="text-xs text-muted-foreground">(Needs Clarification)</p>
+              <p className="text-xs text-muted-foreground">Needs Clarification</p>
             </div>
 
             {/* Deferred - Neutral (NOT "Not Eligible") */}
@@ -131,8 +120,7 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
                 <AlertCircle className="h-5 w-5 text-muted-foreground" />
               </div>
               <p className="text-3xl font-bold text-foreground mb-1">{summary.deferredCount}</p>
-              <p className="text-xs text-muted-foreground">ውሳኔ ተላልፏል</p>
-              <p className="text-xs text-muted-foreground">(Decision Deferred)</p>
+              <p className="text-xs text-muted-foreground">Decision Deferred</p>
             </div>
           </div>
         </CardContent>
@@ -145,7 +133,7 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                ዋና ጉዳዮች (Key Issues)
+                Key Issues
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -166,7 +154,7 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Info className="h-4 w-4 text-muted-foreground" />
-                ተጨማሪ መረጃ ያስፈልጋል (Additional Info Needed)
+                Additional Information Needed
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -185,13 +173,8 @@ const ExecutiveSummaryStep = ({ summary }: ExecutiveSummaryStepProps) => {
 
       {/* Disclaimer */}
       <div className="p-4 rounded-lg bg-muted/30 border text-sm text-muted-foreground">
-        <p className="font-medium mb-1">⚠️ ማስጠንቀቂያ (Disclaimer):</p>
-        <p>
-          ይህ ማጠቃለያ ምክር ብቻ ነው። የመጨረሻ ውሳኔዎች በመደበኛ ሪፖርት ውስጥ ይቀርባሉ።
-        </p>
-        <p className="text-xs mt-1">
-          (This summary is advisory only. Final decisions are presented in the Formal Report.)
-        </p>
+        <p className="font-medium mb-1">Disclaimer:</p>
+        <p>This summary is advisory only. Final decisions are presented in the Formal Report.</p>
       </div>
     </div>
   );

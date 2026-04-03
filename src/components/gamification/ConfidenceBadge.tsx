@@ -14,37 +14,29 @@ const confidenceConfig: Record<ConfidenceLevel, {
   colorDot: string;
   bgColor: string;
   textColor: string;
-  labelAmharic: string;
-  labelEnglish: string;
-  tooltipAmharic: string;
-  tooltipEnglish: string;
+  label: string;
+  tooltip: string;
 }> = {
   high: {
     colorDot: "bg-success",
     bgColor: "bg-success/10",
     textColor: "text-success",
-    labelAmharic: "ከፍተኛ",
-    labelEnglish: "High",
-    tooltipAmharic: "ይህ ውሳኔ በቀረበው ማስረጃ ላይ ተመስርቶ ነው",
-    tooltipEnglish: "This conclusion is based on strong available evidence",
+    label: "High",
+    tooltip: "This conclusion is based on strong available evidence",
   },
   medium: {
     colorDot: "bg-warning",
     bgColor: "bg-warning/10",
     textColor: "text-warning",
-    labelAmharic: "መካከለኛ",
-    labelEnglish: "Medium",
-    tooltipAmharic: "ይህ ውሳኔ ተጨማሪ ማረጋገጫ ሊያስፈልገው ይችላል",
-    tooltipEnglish: "This conclusion may require additional verification",
+    label: "Medium",
+    tooltip: "This conclusion may require additional verification",
   },
   low: {
     colorDot: "bg-destructive",
     bgColor: "bg-destructive/10",
     textColor: "text-destructive",
-    labelAmharic: "ዝቅተኛ",
-    labelEnglish: "Low",
-    tooltipAmharic: "ይህ ውሳኔ በቂ ማስረጃ የለውም — ባለሥልጣን ግምገማ ያስፈልጋል",
-    tooltipEnglish: "This conclusion lacks sufficient evidence — officer review required",
+    label: "Low",
+    tooltip: "This conclusion lacks sufficient evidence — officer review required",
   },
 };
 
@@ -73,14 +65,13 @@ const ConfidenceBadge = ({ level, showLabel = true, size = "md", className }: Co
             <span className={cn("rounded-full shrink-0 animate-pulse", config.colorDot, sizes.dot)} />
             {showLabel && (
               <span className={cn("font-medium", config.textColor, sizes.text)}>
-                {config.labelAmharic}
+                {config.label}
               </span>
             )}
           </div>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
-          <p className="font-medium">{config.tooltipAmharic}</p>
-          <p className="text-xs text-muted-foreground mt-1">{config.tooltipEnglish}</p>
+          <p className="font-medium">{config.tooltip}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

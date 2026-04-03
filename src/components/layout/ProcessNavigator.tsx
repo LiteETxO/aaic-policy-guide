@@ -12,7 +12,6 @@ import {
 
 export interface ProcessStep {
   id: number;
-  labelAmharic: string;
   labelEnglish: string;
   icon: typeof BookOpen;
   description: string;
@@ -21,35 +20,30 @@ export interface ProcessStep {
 export const PROCESS_STEPS: ProcessStep[] = [
   {
     id: 1,
-    labelAmharic: "የሰነድ ዝግጅት",
     labelEnglish: "Documents",
     icon: FileText,
     description: "Load policy library, upload investment license and commercial invoice",
   },
   {
     id: 2,
-    labelAmharic: "የንጥል ትንተና",
     labelEnglish: "Analysis",
     icon: ClipboardList,
     description: "AI-powered analysis of each line item against policy directives",
   },
   {
     id: 3,
-    labelAmharic: "ማስረጃ ግምገማ",
     labelEnglish: "Evidence",
     icon: FileSearch,
     description: "Review policy citations and evidence binding for each item",
   },
   {
     id: 4,
-    labelAmharic: "ማጠቃለያ (ምክር)",
     labelEnglish: "Summary",
     icon: BarChart3,
     description: "Preliminary advisory summary — review after evidence is confirmed",
   },
   {
     id: 5,
-    labelAmharic: "መደበኛ ሪፖርት",
     labelEnglish: "Report",
     icon: FileOutput,
     description: "Generate official decision report for download, email, or print",

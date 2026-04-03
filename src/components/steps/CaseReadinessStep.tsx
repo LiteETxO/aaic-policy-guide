@@ -26,7 +26,7 @@ interface CaseReadinessStepProps {
  * - Case document uploads
  * - Readiness meters
  * - Document status
- * 
+ *
  * Does NOT show:
  * - Executive Summary
  * - Eligibility labels
@@ -40,12 +40,11 @@ const CaseReadinessStep = ({
 }: CaseReadinessStepProps) => {
   // Calculate readiness score
   const readinessItems = [
-    { label: "License Uploaded", labelAmharic: "ፈቃድ ተጫነ", done: licenseUploaded },
-    { label: "Invoice Uploaded", labelAmharic: "ደረሰኝ ተጫነ", done: invoiceUploaded },
+    { label: "License Uploaded", done: licenseUploaded },
+    { label: "Invoice Uploaded", done: invoiceUploaded },
   ];
 
   const readinessScore = (readinessItems.filter((r) => r.done).length / readinessItems.length) * 100;
-  const allComplete = uploadedDocuments.every((d) => d.status === "complete");
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -56,9 +55,9 @@ const CaseReadinessStep = ({
             <FileText className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold">የጉዳይ ዝግጁነት (Case Readiness)</h2>
+            <h2 className="text-2xl font-bold">Case Readiness</h2>
             <p className="text-sm text-muted-foreground">
-              የፍቃድ እና የደረሰኝ ሰነዶችን ይጫኑ
+              Upload license and invoice documents to begin
             </p>
           </div>
         </div>
@@ -70,7 +69,7 @@ const CaseReadinessStep = ({
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <Gauge className="h-5 w-5 text-primary" />
-              የጉዳይ ዝግጁነት (Case Readiness)
+              Case Readiness
             </CardTitle>
             <Badge
               variant="outline"
@@ -80,7 +79,7 @@ const CaseReadinessStep = ({
                   : "bg-warning/10 text-warning border-warning/30"
               )}
             >
-              {Math.round(readinessScore)}% ዝግጁ
+              {Math.round(readinessScore)}% Ready
             </Badge>
           </div>
         </CardHeader>
@@ -114,17 +113,16 @@ const CaseReadinessStep = ({
                 )}
                 <div className="flex-1">
                   <p className={cn("text-sm font-medium", item.done ? "text-success" : "text-muted-foreground")}>
-                    {item.labelAmharic}
+                    {item.label}
                   </p>
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
                 </div>
                 {item.done ? (
                   <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs">
-                    ✓ ተጫነ
+                    ✓ Uploaded
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-muted-foreground text-xs">
-                    ያስፈልጋል
+                    Required
                   </Badge>
                 )}
               </div>
@@ -135,7 +133,7 @@ const CaseReadinessStep = ({
           {uploadedDocuments.length > 0 && (
             <div className="pt-4 border-t">
               <h4 className="text-sm font-medium mb-3 text-muted-foreground">
-                የሰነድ ሁኔታ (Document Status)
+                Document Status
               </h4>
               <div className="space-y-2">
                 {uploadedDocuments.map((doc) => (
@@ -154,7 +152,7 @@ const CaseReadinessStep = ({
                     )}
                     <span className="flex-1 truncate">{doc.name}</span>
                     <Badge variant="secondary" className="text-xs">
-                      {doc.type === "license" ? "ፈቃድ" : "ደረሰኝ"}
+                      {doc.type === "license" ? "License" : "Invoice"}
                     </Badge>
                   </div>
                 ))}
@@ -190,7 +188,7 @@ const CaseReadinessStep = ({
       <div className="flex items-center gap-2 p-4 rounded-lg bg-muted/30 border border-border text-sm text-muted-foreground">
         <Lock className="h-4 w-4 shrink-0" />
         <span>
-          <span className="font-medium">ማሳሰቢያ:</span> በዚህ ደረጃ ምንም ውሳኔ አይደረግም። (No conclusions are made at this stage.)
+          <span className="font-medium">Note:</span> No conclusions are made at this stage.
         </span>
       </div>
     </div>

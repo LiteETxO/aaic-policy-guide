@@ -71,31 +71,26 @@ const DocumentPreparationStep = ({
     {
       section: "policy",
       label: "Policy Documents Loaded",
-      labelAmharic: "የፖሊሲ ሰነዶች ተጫኑ",
       done: totalPolicyDocs > 0
     },
     {
       section: "policy",
       label: "Articles Indexed",
-      labelAmharic: "አንቀጾች ተዘረዘሩ",
       done: policyDocuments.some((d) => (d.articlesIndexed ?? 0) > 0)
     },
     {
       section: "policy",
       label: "Capital Goods List Found",
-      labelAmharic: "የካፒታል ዕቃዎች ዝርዝር ተገኘ",
       done: hasCapitalGoodsList
     },
     {
       section: "case",
       label: "License Uploaded",
-      labelAmharic: "ፈቃድ ተጫነ",
       done: licenseUploaded
     },
     {
       section: "case",
       label: "Invoice Uploaded",
-      labelAmharic: "ደረሰኝ ተጫነ",
       done: invoiceUploaded
     },
   ];

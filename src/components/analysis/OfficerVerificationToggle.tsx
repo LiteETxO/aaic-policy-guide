@@ -37,20 +37,20 @@ const OfficerVerificationToggle = ({
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <Label 
-              htmlFor="officer-verification-mode" 
+            <Label
+              htmlFor="officer-verification-mode"
               className="text-sm font-semibold cursor-pointer"
             >
-              የባለስልጣን ማረጋገጫ ሁነታ
+              Officer Verification Mode
             </Label>
             {isEnabled && (
               <Badge variant="default" className="text-[10px] bg-primary">
-                ገባሪ (Active)
+                Active
               </Badge>
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Officer Verification Mode
+            Hides AI confidence scores — shows clause references only
           </p>
         </div>
       </div>

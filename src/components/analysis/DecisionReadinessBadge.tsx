@@ -18,42 +18,36 @@ interface DecisionReadinessBadgeProps {
 const config: Record<DecisionReadiness, {
   icon: typeof CheckCircle2;
   label: string;
-  labelAmharic: string;
   color: string;
   bgColor: string;
 }> = {
   eligible_ready: {
     icon: CheckCircle2,
     label: "Eligible – Ready for Approval",
-    labelAmharic: "ብቁ – ለማጽደቅ ዝግጁ",
     color: "text-success",
     bgColor: "bg-success/10 border-success/40",
   },
   eligible_confirmation: {
     icon: AlertCircle,
     label: "Eligible – Officer Confirmation Needed",
-    labelAmharic: "ብቁ – የመኮንን ማረጋገጫ ያስፈልጋል",
     color: "text-warning",
     bgColor: "bg-warning/10 border-warning/40",
   },
   provisionally_eligible: {
     icon: AlertCircle,
     label: "Provisionally Eligible – No Disqualifying Clause",
-    labelAmharic: "ጊዜያዊ ብቁ – የሚያስወጣ ድንጋጌ የለም",
     color: "text-primary",
     bgColor: "bg-primary/10 border-primary/40",
   },
   not_eligible: {
     icon: XCircle,
     label: "Not Eligible (Policy-based)",
-    labelAmharic: "ብቁ አይደለም (በፖሊሲ መሰረት)",
     color: "text-destructive",
     bgColor: "bg-destructive/10 border-destructive/40",
   },
   pending: {
     icon: Clock,
     label: "Analysis In Progress",
-    labelAmharic: "ትንተና በሂደት ላይ",
     color: "text-muted-foreground",
     bgColor: "bg-muted border-border",
   },

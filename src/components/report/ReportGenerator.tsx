@@ -155,34 +155,30 @@ export const ReportGenerator = ({ analysisData }: ReportGeneratorProps) => {
 
     return {
       metadata: {
-        investorName: licenseSnapshot?.licensedActivity ? 
-          `${licenseSnapshot.licensedActivity} Investor` : "ያልተገለጸ (Not Specified)",
-        licenseNumber: licenseSnapshot?.licenseNumber || "ያልተገለጸ (Not Specified)",
+        investorName: licenseSnapshot?.licensedActivity ?
+          `${licenseSnapshot.licensedActivity} Investor` : "Not Specified",
+        licenseNumber: licenseSnapshot?.licenseNumber || "Not Specified",
         caseReferenceId: `AAIC-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-        dateOfAnalysis: new Date().toLocaleDateString("am-ET", {
+        dateOfAnalysis: new Date().toLocaleDateString("en-US", {
           year: "numeric",
           month: "long",
           day: "numeric",
-        }) + ` (${new Date().toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })})`,
-        preparedBy: "የኤ.አ.ኢ.ኮ የፖሊሲ ውሳኔ ድጋፍ ስርዓት (AAIC Policy Decision Support System)",
+        }),
+        preparedBy: "AAIC Policy Decision Support System",
       },
       executiveSummary: {
-        overallStatus: execSummary?.overallStatus || "ያልታወቀ (Unknown)",
+        overallStatus: execSummary?.overallStatus || "Unknown",
         totalItemsReviewed: complianceItems.length,
         eligibleCount,
         clarificationCount,
         notEligibleCount,
         topIssues: execSummary?.topIssues || [],
         additionalInfoNeeded: execSummary?.additionalInfoNeeded || [],
-        recommendation: notEligibleCount > 0 
-          ? "አንዳንድ ዕቃዎች ብቁ አይደሉም - ዝርዝር ግምገማ ያስፈልጋል (Some items are not eligible - detailed review required)"
+        recommendation: notEligibleCount > 0
+          ? "Some items are not eligible — detailed review required"
           : clarificationCount > 0
-          ? "አንዳንድ ዕቃዎች ተጨማሪ ማብራሪያ ይፈልጋሉ (Some items require additional clarification)"
-          : "ሁሉም ዕቃዎች ለማጽደቅ ዝግጁ ይመስላሉ (All items appear ready for approval)",
+          ? "Some items require additional clarification"
+          : "All items appear ready for approval",
       },
       documentsReviewed,
       policyBasis: Array.from(policyBasisMap.values()),
@@ -194,11 +190,9 @@ export const ReportGenerator = ({ analysisData }: ReportGeneratorProps) => {
         canProceed,
         requiresClarification,
         cannotApprove,
-        officerAuthorityReminder: 
-          "ይህ ትንተና የምክር ባህሪ ያለው ሲሆን የመጨረሻ ውሳኔዎች በባለስልጣኑ ስልጣን ላይ ናቸው። " +
-          "ባለስልጣኑ ሁሉንም ማስረጃዎች በነጻነት መገምገም እና ተገቢ ውሳኔ መስጠት ይችላል።\n" +
-          "(This analysis is advisory. Final decisions rest with the officer's authority. " +
-          "The officer may independently evaluate all evidence and make appropriate decisions.)",
+        officerAuthorityReminder:
+          "This analysis is advisory. Final decisions rest with the officer's authority. " +
+          "The officer may independently evaluate all evidence and make appropriate decisions.",
       },
     };
   }, [analysisData]);
@@ -217,10 +211,10 @@ export const ReportGenerator = ({ analysisData }: ReportGeneratorProps) => {
             </div>
             <div>
               <CardTitle className="text-lg">
-                መደበኛ የውሳኔ ሪፖርት (Formal Decision Report)
+                Formal Decision Report
               </CardTitle>
               <CardDescription>
-                ለህትመት/ፒዲኤፍ/ዶክስ ማውጣት ዝግጁ (Ready for Print/PDF/DOCX Export)
+                Ready for Print / PDF / DOCX Export
               </CardDescription>
             </div>
           </div>
@@ -241,12 +235,12 @@ export const ReportGenerator = ({ analysisData }: ReportGeneratorProps) => {
               {showReport ? (
                 <>
                   <EyeOff className="h-4 w-4" />
-                  <span>ደብቅ (Hide)</span>
+                  <span>Hide</span>
                 </>
               ) : (
                 <>
                   <Eye className="h-4 w-4" />
-                  <span>አሳይ (Preview)</span>
+                  <span>Preview</span>
                 </>
               )}
             </Button>

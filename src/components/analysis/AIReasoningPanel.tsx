@@ -72,12 +72,8 @@ const AIReasoningPanel = ({ data, className, defaultOpen = false }: AIReasoningP
               <Brain className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">
-                🧠 ስርዓቱ ይህን ዕቃ እንዴት ገመገመው
-              </p>
-              <p className="text-xs text-muted-foreground">
-                How the system evaluated this item
-              </p>
+              <p className="text-sm font-semibold text-foreground">AI Reasoning</p>
+              <p className="text-xs text-muted-foreground">How the system evaluated this item</p>
             </div>
           </div>
           {isOpen ? (
@@ -93,17 +89,14 @@ const AIReasoningPanel = ({ data, className, defaultOpen = false }: AIReasoningP
         <div className="p-3 rounded-lg bg-muted/30 border border-border">
           <div className="flex items-center gap-2 mb-2">
             <Tag className="h-4 w-4 text-primary" />
-            <h5 className="text-sm font-semibold">የዕቃ ትርጓሜ (Item Interpretation)</h5>
+            <h5 className="text-sm font-semibold">Item Interpretation</h5>
           </div>
           <p className="text-sm text-foreground">
-            ይህ ዕቃ እንደ: <span className="font-medium text-primary">{data.itemInterpretation.classifiedAsAmharic || data.itemInterpretation.classifiedAs}</span>
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Classified as: {data.itemInterpretation.classifiedAs}
+            Classified as: <span className="font-medium text-primary">{data.itemInterpretation.classifiedAs}</span>
           </p>
           <div className="flex items-center gap-2 mt-2">
             <Badge variant="outline" className="text-xs bg-primary/5">
-              {data.itemInterpretation.capitalGoodsCategoryAmharic || data.itemInterpretation.capitalGoodsCategory}
+              {data.itemInterpretation.capitalGoodsCategory}
             </Badge>
           </div>
         </div>
@@ -112,7 +105,7 @@ const AIReasoningPanel = ({ data, className, defaultOpen = false }: AIReasoningP
         <div className="p-3 rounded-lg bg-muted/30 border border-border">
           <div className="flex items-center gap-2 mb-2">
             <BookOpen className="h-4 w-4 text-primary" />
-            <h5 className="text-sm font-semibold">የተመከሩ የፖሊሲ ምንጮች (Policy Sources Consulted)</h5>
+            <h5 className="text-sm font-semibold">Policy Sources Consulted</h5>
           </div>
           <ul className="space-y-2">
             {data.policySources.map((source, idx) => (
@@ -146,7 +139,7 @@ const AIReasoningPanel = ({ data, className, defaultOpen = false }: AIReasoningP
           <div className="p-3 rounded-lg bg-success/5 border border-success/20">
             <div className="flex items-center gap-2 mb-2">
               <Scale className="h-4 w-4 text-success" />
-              <h5 className="text-sm font-semibold text-success">ትክክለኛ ድንጋጌ ተጠቅሷል (Exact Clause Cited)</h5>
+              <h5 className="text-sm font-semibold text-success">Exact Clause Cited</h5>
             </div>
             <div className="space-y-3">
               {data.citedClauses.map((clause, idx) => (
@@ -156,17 +149,12 @@ const AIReasoningPanel = ({ data, className, defaultOpen = false }: AIReasoningP
                       {clause.clauseId}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      {clause.articleSection} • ገጽ {clause.pageNumber}
+                      {clause.articleSection} · p. {clause.pageNumber}
                     </span>
                   </div>
                   <p className="text-sm italic text-foreground leading-relaxed">
-                    "{clause.clauseTextAmharic || clause.clauseText}"
+                    "{clause.clauseText}"
                   </p>
-                  {clause.clauseTextAmharic && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      "{clause.clauseText}"
-                    </p>
-                  )}
                 </div>
               ))}
             </div>
@@ -178,7 +166,7 @@ const AIReasoningPanel = ({ data, className, defaultOpen = false }: AIReasoningP
           <div className="p-3 rounded-lg bg-warning/5 border border-warning/20">
             <div className="flex items-center gap-2 mb-2">
               <Search className="h-4 w-4 text-warning" />
-              <h5 className="text-sm font-semibold text-warning">🔍 የፖሊሲ ትርጓሜ ሁነታ (Policy Interpretation Mode)</h5>
+              <h5 className="text-sm font-semibold text-warning">Policy Interpretation Mode</h5>
             </div>
             <p className="text-xs text-muted-foreground mb-2">Keywords were expanded to:</p>
             <div className="flex flex-wrap gap-1">
@@ -199,10 +187,7 @@ const AIReasoningPanel = ({ data, className, defaultOpen = false }: AIReasoningP
               <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-warning">
-                  ⚠️ የፖሊሲ ክፍተት ተገኝቷል — የአለቃ ግምገማ ይመከራል
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Policy gap detected — recommend supervisor review
+                  Policy Gap Detected — Supervisor Review Recommended
                 </p>
                 {data.policyGapMessage && (
                   <p className="text-sm text-foreground mt-1">{data.policyGapMessage}</p>
@@ -225,17 +210,8 @@ const AIReasoningPanel = ({ data, className, defaultOpen = false }: AIReasoningP
               data.policyGapDetected ? "text-warning" : "text-success"
             )} />
             <div>
-              <h5 className="text-sm font-semibold mb-1">
-                {data.policyGapDetected ? "ጊዜያዊ ድምዳሜ" : "ድምዳሜ"} (Conclusion)
-              </h5>
-              <p className="text-sm text-foreground">
-                {data.conclusionAmharic || data.conclusion}
-              </p>
-              {data.conclusionAmharic && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {data.conclusion}
-                </p>
-              )}
+              <h5 className="text-sm font-semibold mb-1">Conclusion</h5>
+              <p className="text-sm text-foreground">{data.conclusion}</p>
             </div>
           </div>
         </div>

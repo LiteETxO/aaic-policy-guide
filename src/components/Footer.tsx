@@ -11,7 +11,6 @@ const Footer = () => {
             </div>
             <div>
               <p className="font-semibold">Addis Ababa Investment Commission</p>
-              <p className="text-sm text-muted-foreground">አዲስ አበባ ኢንቨስትመንት ኮሚሽን</p>
             </div>
           </div>
 

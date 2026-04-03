@@ -107,12 +107,47 @@ const transformDecisionReadiness = (
   return "pending";
 };
 
+// Normalize eligibility from any field variant to a canonical value
+export type NormalizedEligibility = "eligible" | "excluded" | "review";
+
+export const normalizeEligibility = (item: any): NormalizedEligibility => {
+  const raw = (
+    item?.eligibilityStatus ||
+    item?.eligibility ||
+    item?.complianceStatus ||
+    item?.decisionReadiness ||
+    ""
+  ).toLowerCase();
+
+  if (
+    raw.includes("eligible") &&
+    !raw.includes("not eligible") &&
+    !raw.includes("ineligible") ||
+    raw === "eligible_ready" ||
+    raw === "provisionally_eligible" ||
+    raw.includes("duty-free") ||
+    raw.includes("listed capital good") ||
+    raw.includes("essential capital good")
+  ) {
+    return "eligible";
+  }
+  if (
+    raw.includes("not eligible") ||
+    raw.includes("ineligible") ||
+    raw.includes("excluded") ||
+    raw === "not_eligible"
+  ) {
+    return "excluded";
+  }
+  return "review";
+};
+
 // Build AI reasoning data from available information
 const buildReasoningData = (item: AnalysisItem): AIReasoningData => {
   const policyGapDetected = item.policyMatch === "Not Listed";
-  
+
   // Extract policy sources from citations
-  const policySources = item.citations.length > 0 
+  const policySources = item.citations.length > 0
     ? [...new Set(item.citations.map(c => c.documentName))].map(docName => ({
         documentName: docName,
         issuingAuthority: "Ministry of Finance",
@@ -140,9 +175,7 @@ const buildReasoningData = (item: AnalysisItem): AIReasoningData => {
   return {
     itemInterpretation: {
       classifiedAs: item.equipmentType || "Capital Equipment",
-      classifiedAsAmharic: item.equipmentTypeAmharic || "ካፒታል መሣሪያ",
       capitalGoodsCategory: item.capitalGoodsCategory || "Industrial Equipment",
-      capitalGoodsCategoryAmharic: item.capitalGoodsCategoryAmharic || "የኢንዱስትሪ መሣሪያ",
     },
     policySources,
     citedClauses,
@@ -150,15 +183,13 @@ const buildReasoningData = (item: AnalysisItem): AIReasoningData => {
       {
         step: "policy_search",
         description: "Searched policy clause index for matching items",
-        descriptionAmharic: "ለተዛማጅ ዕቃዎች የፖሊሲ ድንጋጌ ኢንዴክስ ተፈትሻል",
-        status: item.policyMatch === "Listed" || item.policyMatch === "Mapped" ? "complete" : 
+        status: item.policyMatch === "Listed" || item.policyMatch === "Mapped" ? "complete" :
                item.policyMatch === "Checking" ? "partial" : "not_found",
       },
       {
         step: "license_alignment",
         description: "Verified alignment with licensed activity",
-        descriptionAmharic: "ከፈቃድ እንቅስቃሴ ጋር መስማማት ተረጋግጧል",
-        status: item.licenseAlignment === "Aligned" ? "complete" : 
+        status: item.licenseAlignment === "Aligned" ? "complete" :
                item.licenseAlignment === "Conditional" ? "partial" : "not_found",
       },
     ],
@@ -167,11 +198,6 @@ const buildReasoningData = (item: AnalysisItem): AIReasoningData => {
       : policyGapDetected
         ? `No clause directly excludes or disqualifies this item. Provisionally eligible pending supervisor confirmation.`
         : `Analysis in progress for ${item.normalizedName || item.invoiceItem || "Item"}.`,
-    conclusionAmharic: item.policyMatch === "Listed" || item.policyMatch === "Mapped"
-      ? `${item.normalizedName || item.invoiceItem || "Item"} በፖሊሲ ግጥጥም መሰረት ከቀረጥ ነፃ ካፒታል እቃ ነው።`
-      : policyGapDetected
-        ? `ይህን ዕቃ የሚያወጣ ወይም ብቁ ያልሆነ ድንጋጌ የለም። ጊዜያዊ ብቁ - የአለቃ ማረጋገጫ ይጠበቃል።`
-        : `ለ${item.normalizedName || item.invoiceItem || "Item"} ትንተና በሂደት ላይ።`,
     policyGapDetected,
     policyGapMessage: policyGapDetected
       ? "No clause directly excludes or disqualifies this item."
@@ -220,7 +246,6 @@ const transformToItemCardData = (item: AnalysisItem, totalItems: number): ItemCa
 
   // Spec 4️⃣: Use AI-provided systemAssociation first, fallback to derivation
   let systemAssociation = item.systemAssociation;
-  let systemAssociationAmharic = item.systemAssociationAmharic;
   
   if (!systemAssociation) {
     const lowerName = item.normalizedName?.toLowerCase() || "";
@@ -228,25 +253,19 @@ const transformToItemCardData = (item: AnalysisItem, totalItems: number): ItemCa
     if (lowerName.includes("transform") || lowerName.includes("switch") || lowerName.includes("breaker") || 
         lowerName.includes("cable") || lowerName.includes("panel") || lowerName.includes("meter")) {
       systemAssociation = "Power Distribution System";
-      systemAssociationAmharic = "የኃይል ስርጭት ስርዓት";
     } else if (lowerName.includes("cool") || lowerName.includes("hvac") || lowerName.includes("chiller") ||
                lowerName.includes("air condition") || lowerName.includes("refriger")) {
       systemAssociation = "Cooling / HVAC System";
-      systemAssociationAmharic = "የማቀዝቀዣ / HVAC ስርዓት";
     } else if (lowerName.includes("server") || lowerName.includes("network") || lowerName.includes("router") ||
                lowerName.includes("storage") || lowerName.includes("rack")) {
       systemAssociation = "IT Infrastructure";
-      systemAssociationAmharic = "የአይቲ መሠረተ ልማት";
     } else if (lowerName.includes("generator") || lowerName.includes("ups") || lowerName.includes("battery")) {
       systemAssociation = "Power Generation / Backup";
-      systemAssociationAmharic = "የኃይል ማመንጫ / ማስቀመጫ";
     } else if (lowerName.includes("fire") || lowerName.includes("suppression") || lowerName.includes("alarm")) {
       systemAssociation = "Fire Safety System";
-      systemAssociationAmharic = "የእሳት ደህንነት ስርዓት";
     } else if (lowerName.includes("security") || lowerName.includes("access") || lowerName.includes("cctv") ||
                lowerName.includes("camera")) {
       systemAssociation = "Security / Access Control";
-      systemAssociationAmharic = "የደህንነት / መግቢያ ቁጥጥር";
     }
   }
 
@@ -256,20 +275,15 @@ const transformToItemCardData = (item: AnalysisItem, totalItems: number): ItemCa
     itemName: item.normalizedName || item.invoiceItem || "Item",
     invoiceReference: item.invoiceItem,
     equipmentType: item.equipmentType || "Capital Equipment",
-    equipmentTypeAmharic: item.equipmentTypeAmharic || "ካፒታል መሣሪያ",
     capitalGoodsCategory: item.capitalGoodsCategory || "Industrial Machinery",
-    capitalGoodsCategoryAmharic: item.capitalGoodsCategoryAmharic || "የኢንዱስትሪ ማሽነሪ",
     itemClassification,
     systemAssociation,
-    systemAssociationAmharic,
     policyMatchStatus,
     decisionReadiness,
     licenseAlignment: {
       status: item.licenseAlignment,
       licenseName: item.licenseName || "Investment License",
-      licenseNameAmharic: item.licenseNameAmharic || "የኢንቨስትመንት ፈቃድ",
       functionalRequirement: item.functionalRequirement || "is functionally required for operation of licensed infrastructure.",
-      functionalRequirementAmharic: item.functionalRequirementAmharic || "ለፈቃድ ያለው መሠረተ ልማት አሠራር ተግባራዊ አስፈላጊ ነው።",
     },
     reasoning: buildReasoningData(item),
     citations: item.citations.map(c => ({
@@ -330,67 +344,87 @@ const ItemAnalysisStep = ({
     ? ((stats.eligible + stats.needsConfirmation + stats.notEligible) / items.length) * 100 
     : 0;
 
+  // Overall recommendation sentence
+  const overallRecommendation = (() => {
+    if (items.length === 0) return "";
+    if (stats.notEligible === 0 && stats.needsConfirmation === 0) {
+      return `All ${stats.eligible} items appear eligible for duty exemption. No exclusions detected.`;
+    }
+    if (stats.eligible > 0 && stats.notEligible > 0) {
+      return `${stats.eligible} item(s) eligible for duty exemption; ${stats.notEligible} item(s) excluded by policy. Review flagged items before proceeding.`;
+    }
+    if (stats.needsConfirmation > 0) {
+      return `${stats.needsConfirmation} item(s) require officer confirmation before a final determination can be issued.`;
+    }
+    return `Analysis complete. ${items.length} item(s) processed.`;
+  })();
+
   return (
     <div className="p-6 lg:p-8 space-y-6">
       {/* Section Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <ClipboardList className="h-5 w-5 text-primary" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold">የንጥል ትንተና (Item Analysis)</h2>
-            <p className="text-sm text-muted-foreground">
-              እያንዳንዱን የደረሰኝ ዕቃ ከፖሊሲ ጋር ያረጋግጡ
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+          <ClipboardList className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold">Item Analysis</h2>
+          <p className="text-sm text-muted-foreground">
+            Policy compliance check — each invoice item matched against the capital goods clause index.
+          </p>
         </div>
       </div>
 
-      {/* Summary Stats Card */}
-      <Card className="bg-gradient-to-r from-primary/5 to-accent/5 border-primary/20">
-        <CardContent className="pt-4">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart3 className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold">ትንተና ሂደት (Analysis Progress)</span>
-            <Badge variant="outline" className="ml-auto">
-              {Math.round(progressPercentage)}% ተጠናቋል
-            </Badge>
-          </div>
-          <Progress value={progressPercentage} className="h-2 mb-4" />
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="text-center p-2 rounded-lg bg-success/10 border border-success/20">
-              <p className="text-2xl font-bold text-success">{stats.eligible}</p>
-              <p className="text-xs text-success">ብቁ (Eligible)</p>
+      {/* Executive Summary */}
+      {items.length > 0 && (
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">Executive Summary</span>
+              <Badge variant="outline" className="ml-auto text-xs">
+                {Math.round(progressPercentage)}% complete
+              </Badge>
             </div>
-            <div className="text-center p-2 rounded-lg bg-warning/10 border border-warning/20">
-              <p className="text-2xl font-bold text-warning">{stats.needsConfirmation}</p>
-              <p className="text-xs text-warning">ማረጋገጫ (Confirm)</p>
+            <Progress value={progressPercentage} className="h-2 mb-5" />
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <div className="text-center p-3 rounded-lg bg-muted/50 border border-border">
+                <p className="text-2xl font-bold text-foreground">{items.length}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Items Analyzed</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-success/10 border border-success/20">
+                <p className="text-2xl font-bold text-success">{stats.eligible}</p>
+                <p className="text-xs text-success mt-0.5">Eligible</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                <p className="text-2xl font-bold text-destructive">{stats.notEligible}</p>
+                <p className="text-xs text-destructive mt-0.5">Excluded</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-warning/10 border border-warning/20">
+                <p className="text-2xl font-bold text-warning">{stats.needsConfirmation + stats.pending}</p>
+                <p className="text-xs text-warning mt-0.5">Requires Review</p>
+              </div>
             </div>
-            <div className="text-center p-2 rounded-lg bg-destructive/10 border border-destructive/20">
-              <p className="text-2xl font-bold text-destructive">{stats.notEligible}</p>
-              <p className="text-xs text-destructive">ብቁ አይደለም (Ineligible)</p>
-            </div>
-            <div className="text-center p-2 rounded-lg bg-muted border border-border">
-              <p className="text-2xl font-bold text-muted-foreground">{stats.pending}</p>
-              <p className="text-xs text-muted-foreground">በሂደት (Pending)</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+
+            {overallRecommendation && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-background/60 border border-border/50">
+                <Shield className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">Overall Recommendation: </span>
+                  {overallRecommendation}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Advisory Notice */}
-      <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
-        <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            ማሳሰቢያ: ይህ ስርዓት ፖሊሲን በቀጥታ ይተረጉማል - ቁልፍ ቃል ፍለጋ አይደለም።
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Notice: This system interprets policy directly via clause index — not keyword search.
-          </p>
-        </div>
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+        <Shield className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+        <p className="text-xs text-muted-foreground">
+          This system interprets policy directly via the clause index — not keyword search. Each item is matched against verified policy clauses from the capital goods list.
+        </p>
       </div>
 
       {/* Item Cards */}
@@ -410,12 +444,8 @@ const ItemAnalysisStep = ({
       {items.length === 0 && (
         <div className="text-center py-12">
           <ClipboardList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-muted-foreground">
-            ምንም ዕቃዎች አልተተነተኑም
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            No items analyzed yet. Upload documents to begin.
-          </p>
+          <h3 className="text-lg font-semibold text-muted-foreground">No items analyzed yet</h3>
+          <p className="text-sm text-muted-foreground mt-1">Upload documents to begin analysis.</p>
         </div>
       )}
     </div>

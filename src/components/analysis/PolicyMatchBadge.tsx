@@ -16,35 +16,30 @@ interface PolicyMatchBadgeProps {
 const config: Record<PolicyMatchStatus, {
   icon: typeof CheckCircle2;
   label: string;
-  labelAmharic: string;
   color: string;
   bgColor: string;
 }> = {
   matched: {
     icon: CheckCircle2,
     label: "Policy Matched",
-    labelAmharic: "ፖሊሲ ተገኝቷል",
     color: "text-success",
     bgColor: "bg-success/10 border-success/30",
   },
   partial: {
     icon: AlertTriangle,
     label: "Policy Match – Partial",
-    labelAmharic: "ከፊል ግጥጥም",
     color: "text-warning",
     bgColor: "bg-warning/10 border-warning/30",
   },
   not_found: {
     icon: XCircle,
     label: "No Applicable Policy Found",
-    labelAmharic: "ፖሊሲ አልተገኘም",
     color: "text-destructive",
     bgColor: "bg-destructive/10 border-destructive/30",
   },
   checking: {
     icon: HelpCircle,
     label: "Checking Policy",
-    labelAmharic: "በመፈተሽ ላይ",
     color: "text-muted-foreground",
     bgColor: "bg-muted border-border",
   },

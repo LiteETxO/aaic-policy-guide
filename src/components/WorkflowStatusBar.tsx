@@ -9,22 +9,20 @@ import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useState } from "react";
 
-// Amharic-first phase labels
 const phaseConfig: Record<WorkflowPhase, { label: string; icon: React.ElementType; color: string }> = {
-  IDLE: { label: "ዝግጁ (Ready)", icon: CheckCircle2, color: "text-muted-foreground" },
-  POLICY_IMPORT: { label: "የፖሊሲ መግቢያ (Policy Import)", icon: BookOpen, color: "text-primary" },
-  CASE_IMPORT: { label: "የጉዳይ መግቢያ (Case Import)", icon: FileText, color: "text-blue-500" },
-  ANALYSIS: { label: "ትንተና (Analysis)", icon: Search, color: "text-purple-500" },
+  IDLE: { label: "Ready", icon: CheckCircle2, color: "text-muted-foreground" },
+  POLICY_IMPORT: { label: "Policy Import", icon: BookOpen, color: "text-primary" },
+  CASE_IMPORT: { label: "Case Import", icon: FileText, color: "text-blue-500" },
+  ANALYSIS: { label: "Analysis", icon: Search, color: "text-purple-500" },
 };
 
-// Amharic-first state labels
 const stateConfig: Record<WorkflowState, { label: string; icon: React.ElementType; bgColor: string; textColor: string }> = {
-  IDLE: { label: "ዝግጁ (Ready)", icon: CheckCircle2, bgColor: "bg-muted", textColor: "text-muted-foreground" },
-  RUNNING: { label: "በሂደት ላይ (Processing)", icon: Loader2, bgColor: "bg-primary/10", textColor: "text-primary" },
-  BLOCKED: { label: "ታግዷል (Blocked)", icon: AlertOctagon, bgColor: "bg-warning/10", textColor: "text-warning" },
-  COMPLETE: { label: "ተጠናቀቀ (Complete)", icon: CheckCircle2, bgColor: "bg-success/10", textColor: "text-success" },
-  ERROR: { label: "ስህተት (Error)", icon: XCircle, bgColor: "bg-destructive/10", textColor: "text-destructive" },
-  NETWORK_RETRY_READY: { label: "ግንኙነት ተቋርጧል (Connection Issue)", icon: WifiOff, bgColor: "bg-warning/10", textColor: "text-warning" },
+  IDLE: { label: "Ready", icon: CheckCircle2, bgColor: "bg-muted", textColor: "text-muted-foreground" },
+  RUNNING: { label: "Processing", icon: Loader2, bgColor: "bg-primary/10", textColor: "text-primary" },
+  BLOCKED: { label: "Blocked", icon: AlertOctagon, bgColor: "bg-warning/10", textColor: "text-warning" },
+  COMPLETE: { label: "Complete", icon: CheckCircle2, bgColor: "bg-success/10", textColor: "text-success" },
+  ERROR: { label: "Error", icon: XCircle, bgColor: "bg-destructive/10", textColor: "text-destructive" },
+  NETWORK_RETRY_READY: { label: "Connection Issue", icon: WifiOff, bgColor: "bg-warning/10", textColor: "text-warning" },
 };
 
 interface WorkflowStatusBarProps {
@@ -136,7 +134,7 @@ const WorkflowStatusBar = ({ className }: WorkflowStatusBarProps) => {
                       <p className="text-sm font-medium">{blockingReason}</p>
                       {nextAction && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          <span className="font-medium">ቀጣይ እርምጃ (Next Action):</span> {nextAction}
+                          <span className="font-medium">Next Action:</span> {nextAction}
                         </p>
                       )}
                     </div>
@@ -148,7 +146,7 @@ const WorkflowStatusBar = ({ className }: WorkflowStatusBarProps) => {
               {hasDocuments && (
                 <div className="space-y-2 mt-3">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    ሰነዶች (Documents)
+                    Documents
                   </p>
                   <div className="space-y-1.5">
                     {documentStatuses.map((doc, index) => (
@@ -185,20 +183,20 @@ const WorkflowStatusBar = ({ className }: WorkflowStatusBarProps) => {
               
               {/* Phase Progress Indicators */}
               <div className="flex items-center gap-2 pt-2">
-                <PhaseIndicator 
-                  label="ፖሊሲ (Policy)" 
+                <PhaseIndicator
+                  label="Policy"
                   isActive={phase === "POLICY_IMPORT"}
                   isComplete={status.policyLibraryReady}
                 />
                 <div className="h-px flex-1 bg-border" />
-                <PhaseIndicator 
-                  label="ጉዳይ (Case)" 
+                <PhaseIndicator
+                  label="Case"
                   isActive={phase === "CASE_IMPORT"}
                   isComplete={status.caseFilesReady}
                 />
                 <div className="h-px flex-1 bg-border" />
-                <PhaseIndicator 
-                  label="ትንተና (Analysis)" 
+                <PhaseIndicator
+                  label="Analysis"
                   isActive={phase === "ANALYSIS"}
                   isComplete={phase === "ANALYSIS" && state === "COMPLETE"}
                 />

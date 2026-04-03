@@ -70,23 +70,23 @@ export interface ItemCardData {
 // Classification config for display
 const classificationConfig = {
   capital_equipment: {
-    label: "ካፒታል መሣሪያ (Capital Equipment)",
-    shortLabel: "Capital",
+    label: "Capital Equipment",
+    shortLabel: "Capital Equipment",
     color: "text-success",
     bgColor: "bg-success/10",
     borderColor: "border-success/30",
     qualifies: true,
   },
   capital_component: {
-    label: "ካፒታል ክፍል (Capital Component)",
-    shortLabel: "Component",
+    label: "Capital Component",
+    shortLabel: "Capital Component",
     color: "text-emerald-600",
     bgColor: "bg-emerald-500/10",
     borderColor: "border-emerald-500/30",
     qualifies: true,
   },
   tool_consumable: {
-    label: "መሣሪያ / ፍጆታ (Tool / Consumable)",
+    label: "Tool / Consumable",
     shortLabel: "Tool/Consumable",
     color: "text-destructive",
     bgColor: "bg-destructive/10",
@@ -94,7 +94,7 @@ const classificationConfig = {
     qualifies: false,
   },
   ppe: {
-    label: "የደህንነት አልባሳት (PPE)",
+    label: "Personal Protective Equipment (PPE)",
     shortLabel: "PPE",
     color: "text-destructive",
     bgColor: "bg-destructive/10",
@@ -102,7 +102,7 @@ const classificationConfig = {
     qualifies: false,
   },
   unknown: {
-    label: "አልተመደበም (Unclassified)",
+    label: "Unclassified",
     shortLabel: "Unclassified",
     color: "text-muted-foreground",
     bgColor: "bg-muted",
@@ -203,41 +203,31 @@ const ItemCard = ({
             
             {/* NEW: System Association Badge */}
             {data.systemAssociation && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="outline" className="gap-1.5 bg-blue-500/10 text-blue-600 border-blue-500/30">
-                      <Cpu className="h-3 w-3" />
-                      <span className="font-medium">{data.systemAssociationAmharic || data.systemAssociation}</span>
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-sm">የስርዓት ማህበር (System Association)</p>
-                    <p className="text-xs text-muted-foreground">{data.systemAssociation}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Badge variant="outline" className="gap-1.5 bg-blue-500/10 text-blue-600 border-blue-500/30">
+                <Cpu className="h-3 w-3" />
+                <span className="font-medium">{data.systemAssociation}</span>
+              </Badge>
             )}
             
             {/* Equipment Type (fallback if no classification) */}
             {!data.itemClassification && (
               <Badge variant="outline" className="gap-1.5 bg-muted/50">
                 <Cpu className="h-3 w-3" />
-                <span className="font-medium">{data.equipmentTypeAmharic || data.equipmentType}</span>
+                <span className="font-medium">{data.equipmentType}</span>
               </Badge>
             )}
-            
+
             {/* Capital Goods Category */}
             <Badge variant="outline" className="gap-1.5 bg-primary/5 text-primary border-primary/30">
               <Package className="h-3 w-3" />
-              <span className="font-medium">{data.capitalGoodsCategoryAmharic || data.capitalGoodsCategory}</span>
+              <span className="font-medium">{data.capitalGoodsCategory}</span>
             </Badge>
-            
+
             {/* Non-qualifying warning */}
             {data.itemClassification && !classificationConfig[data.itemClassification].qualifies && (
               <Badge variant="destructive" className="gap-1 text-[10px]">
                 <AlertTriangle className="h-3 w-3" />
-                ብቁ አይደለም (Not Eligible)
+                Not Eligible
               </Badge>
             )}
           </div>
@@ -248,7 +238,7 @@ const ItemCard = ({
             {data.citations.length > 0 && (
               <Badge variant="secondary" className="gap-1 text-xs">
                 <BookOpen className="h-3 w-3" />
-                {data.citations.length} ማስረጃ (Evidence)
+                {data.citations.length} Citation{data.citations.length !== 1 ? "s" : ""}
               </Badge>
             )}
           </div>
@@ -271,9 +261,7 @@ const ItemCard = ({
           <div className="p-3 rounded-lg bg-success/5 border border-success/20">
             <div className="flex items-center gap-2 mb-2">
               <BookOpen className="h-4 w-4 text-success" />
-              <h5 className="text-sm font-semibold text-success">
-                የፖሊሲ ጥቅሶች (Policy Citations)
-              </h5>
+              <h5 className="text-sm font-semibold text-success">Policy Citations</h5>
             </div>
             <div className="flex flex-wrap gap-2">
               {data.citations.slice(0, 4).map((citation, idx) => {
@@ -301,13 +289,8 @@ const ItemCard = ({
           onClick={() => setIsExpanded(!isExpanded)}
           className="w-full justify-between hover:bg-primary/5"
         >
-          <span className="flex items-center gap-2">
-            <span className="text-sm font-medium">
-              {isExpanded ? "ዝርዝር ምክንያት ደብቅ" : "ዝርዝር ምክንያት ይመልከቱ"}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              (View AI Reasoning)
-            </span>
+          <span className="text-sm font-medium">
+            {isExpanded ? "Hide AI Reasoning" : "View AI Reasoning"}
           </span>
           {isExpanded ? (
             <ChevronDown className="h-4 w-4" />

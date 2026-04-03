@@ -40,24 +40,22 @@ export type WorkflowStage =
 
 export interface WorkflowStageInfo {
   id: WorkflowStage;
-  labelAmharic: string;
   labelEnglish: string;
   status: "pending" | "in_progress" | "complete" | "failed";
   timestamp?: Date;
 }
 
 export const WORKFLOW_STAGES: WorkflowStageInfo[] = [
-  { id: "license_extracted", labelAmharic: "ፈቃድ ተወስዷል", labelEnglish: "License extracted", status: "pending" },
-  { id: "guideline_matched", labelAmharic: "መመሪያ ተገኘ", labelEnglish: "Guideline section matched", status: "pending" },
-  { id: "categories_loaded", labelAmharic: "ምድቦች ተጫኑ", labelEnglish: "Allowed categories loaded", status: "pending" },
-  { id: "item_clause_bound", labelAmharic: "ዕቃ ተሳሰረ", labelEnglish: "Item clause bound", status: "pending" },
-  { id: "citation_validated", labelAmharic: "ጥቅስ ተረጋገጠ", labelEnglish: "Citation validated", status: "pending" },
+  { id: "license_extracted", labelEnglish: "License extracted", status: "pending" },
+  { id: "guideline_matched", labelEnglish: "Guideline section matched", status: "pending" },
+  { id: "categories_loaded", labelEnglish: "Allowed categories loaded", status: "pending" },
+  { id: "item_clause_bound", labelEnglish: "Item clause bound", status: "pending" },
+  { id: "citation_validated", labelEnglish: "Citation validated", status: "pending" },
 ];
 
 export interface TraceEvent {
   id: string;
   type: TraceEventType;
-  labelAmharic: string;
   labelEnglish: string;
   action: string;
   result: string;
@@ -203,7 +201,6 @@ export const useDecisionTrace = create<DecisionTraceStore>((set, get) => ({
 export const createTraceEvent = {
   policyIndexed: (clauseCount: number, documentVersions: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "policy_indexed",
-    labelAmharic: "የፖሊሲ ማውጫ ተፈጥሯል",
     labelEnglish: "Policy Indexed",
     action: `Indexed ${clauseCount} clauses from ${documentVersions.length} document(s)`,
     result: `Documents: ${documentVersions.join(", ")}`,
@@ -212,7 +209,6 @@ export const createTraceEvent = {
 
   annexVerification: (found: boolean, itemCount?: number): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "annex_verification",
-    labelAmharic: "አባሪ ማረጋገጫ",
     labelEnglish: "Annex II Verification",
     action: "Checking for Capital Goods List (Annex II)",
     result: found 
@@ -225,7 +221,6 @@ export const createTraceEvent = {
 
   documentIngestion: (fileName: string, status: "started" | "complete" | "error"): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "document_ingestion",
-    labelAmharic: "ሰነድ ማስገባት",
     labelEnglish: "Document Ingestion",
     action: status === "started" ? `Processing ${fileName}...` : `Processed ${fileName}`,
     result: status === "complete" ? "Text extracted successfully" : status === "error" ? "Extraction failed" : "In progress...",
@@ -234,7 +229,6 @@ export const createTraceEvent = {
 
   invoicePreservation: (itemCount: number): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "invoice_preservation",
-    labelAmharic: "የደረሰኝ ጽሑፍ ማስቀመጥ",
     labelEnglish: "Invoice Preservation",
     action: "Preserving original invoice text verbatim",
     result: `${itemCount} invoice items identified — original text preserved (not translated)`,
@@ -243,7 +237,6 @@ export const createTraceEvent = {
 
   normalization: (itemNumber: number, original: string, normalized: string): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "normalization",
-    labelAmharic: "ዕቃ መደበኛ ማድረግ",
     labelEnglish: "Item Normalization",
     action: `Normalizing: "${original}"`,
     result: `→ "${normalized}"`,
@@ -253,7 +246,6 @@ export const createTraceEvent = {
 
   clauseQuery: (itemNumber: number, queryTerms: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "clause_query",
-    labelAmharic: "የፍለጋ መጠይቅ",
     labelEnglish: "Clause Query Terms",
     action: `Building search query for item ${itemNumber}`,
     result: `Query terms: [${queryTerms.map(t => `"${t}"`).join(", ")}]`,
@@ -263,7 +255,6 @@ export const createTraceEvent = {
 
   clauseRetrieval: (itemNumber: number, keywords: string[], foundCount: number, clauseIds: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "clause_retrieval",
-    labelAmharic: "የፖሊሲ አንቀጽ መፈለጊያ",
     labelEnglish: "Clause Retrieval",
     action: `Search PolicyClauseIndex using keywords: [${keywords.map(k => `"${k}"`).join(", ")}]`,
     result: foundCount > 0 ? `${foundCount} candidate clause(s) found` : "No clauses found",
@@ -275,7 +266,6 @@ export const createTraceEvent = {
 
   clauseBinding: (itemNumber: number, clauseId: string, documentName: string, pageNumber: number): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "clause_binding",
-    labelAmharic: "አንቀጽ ማሰር",
     labelEnglish: "Clause Binding",
     action: `Binding clause ${clauseId} to item ${itemNumber}`,
     result: `Bound from ${documentName}, page ${pageNumber}`,
@@ -286,7 +276,6 @@ export const createTraceEvent = {
 
   decisionPath: (itemNumber: number, path: "exact" | "mapped" | "essentiality" | "deferred"): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "decision_path",
-    labelAmharic: "የውሳኔ መንገድ",
     labelEnglish: "Decision Path",
     action: `Determining decision path for item ${itemNumber}`,
     result: path === "exact" ? "Exact Match — item found in Capital Goods List" :
@@ -300,7 +289,6 @@ export const createTraceEvent = {
 
   licenseAlignment: (itemNumber: number, scope: string, aligned: boolean): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "license_alignment",
-    labelAmharic: "የፈቃድ ማመሳከር",
     labelEnglish: "License Alignment",
     action: `Checking license scope: "${scope}"`,
     result: aligned ? "Item aligns with licensed activity" : "Alignment unclear — requires clarification",
@@ -310,7 +298,6 @@ export const createTraceEvent = {
 
   essentialityCheck: (itemNumber: number, status: "passed" | "pending" | "failed"): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "essentiality_check",
-    labelAmharic: "አስፈላጊነት ግምገማ",
     labelEnglish: "Essentiality Evaluation",
     action: `Evaluating essentiality for item ${itemNumber}`,
     result: status === "passed" ? "Essential to licensed operation" :
@@ -322,7 +309,6 @@ export const createTraceEvent = {
 
   citationCheck: (itemNumber: number, complete: boolean, missingFields: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "citation_check",
-    labelAmharic: "ጥቅስ ማረጋገጫ",
     labelEnglish: "Citation Completeness",
     action: `Validating citations for item ${itemNumber}`,
     result: complete 
@@ -335,7 +321,6 @@ export const createTraceEvent = {
 
   confidenceScore: (itemNumber: number, score: number, factors: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "confidence_score",
-    labelAmharic: "የእምነት ነጥብ",
     labelEnglish: "Confidence Score",
     action: `Calculating confidence for item ${itemNumber}`,
     result: `Score: ${score}% | Factors: ${factors.join(", ")}`,
@@ -345,7 +330,6 @@ export const createTraceEvent = {
 
   decisionOutput: (itemNumber: number, decision: string, clauseCount: number): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "decision_output",
-    labelAmharic: "የውሳኔ ውጤት",
     labelEnglish: "Decision Output",
     action: `Finalizing decision for item ${itemNumber}`,
     result: `${decision} (${clauseCount} citation(s) bound)`,
@@ -355,7 +339,6 @@ export const createTraceEvent = {
 
   checkpointState: (stage: string, canResume: boolean): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "checkpoint_state",
-    labelAmharic: "ማስቀመጫ ነጥብ",
     labelEnglish: "Checkpoint State",
     action: `Checkpoint saved at: ${stage}`,
     result: canResume ? "Resume available if interrupted" : "Progress saved",
@@ -364,7 +347,6 @@ export const createTraceEvent = {
 
   blocked: (itemNumber: number | undefined, reason: string, nextAction: string): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "blocked",
-    labelAmharic: "ውሳኔ ተቋርጧል",
     labelEnglish: "Decision Blocked",
     action: "Analysis blocked",
     result: reason,
@@ -376,7 +358,6 @@ export const createTraceEvent = {
 
   info: (message: string): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "info",
-    labelAmharic: "መረጃ",
     labelEnglish: "Info",
     action: message,
     result: "",
@@ -384,7 +365,6 @@ export const createTraceEvent = {
 
   success: (message: string): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "success",
-    labelAmharic: "ተሳክቷል",
     labelEnglish: "Success",
     action: message,
     result: "",
@@ -393,7 +373,6 @@ export const createTraceEvent = {
 
   warning: (message: string): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "warning",
-    labelAmharic: "ማስጠንቀቂያ",
     labelEnglish: "Warning",
     action: message,
     result: "",
@@ -402,7 +381,6 @@ export const createTraceEvent = {
 
   error: (message: string): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "error",
-    labelAmharic: "ስህተት",
     labelEnglish: "Error",
     action: message,
     result: "",
@@ -412,7 +390,6 @@ export const createTraceEvent = {
   // License-first workflow stage events
   licenseExtracted: (licenseName: string, licenseType: string): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "license_extracted",
-    labelAmharic: "ፈቃድ ተወስዷል",
     labelEnglish: "License Extracted",
     action: "Extracting license information verbatim",
     result: `License: "${licenseName}" | Type: "${licenseType}"`,
@@ -421,7 +398,6 @@ export const createTraceEvent = {
 
   guidelineMatched: (matchStatus: "matched" | "partial" | "not_found", sectionTitle?: string, pageNumber?: number): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "guideline_matched",
-    labelAmharic: "መመሪያ ተገኘ",
     labelEnglish: "Guideline Section Matched",
     action: "Searching Policy Clause Index for matching guideline",
     result: matchStatus === "matched" 
@@ -437,7 +413,6 @@ export const createTraceEvent = {
 
   categoriesLoaded: (categoryCount: number, categories: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "categories_loaded",
-    labelAmharic: "ምድቦች ተጫኑ",
     labelEnglish: "Allowed Categories Loaded",
     action: "Loading allowed capital goods categories for this license type",
     result: categoryCount > 0 
@@ -448,7 +423,6 @@ export const createTraceEvent = {
 
   itemClauseBound: (itemNumber: number, clauseId: string, documentName: string, pageNumber: number): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "item_clause_bound",
-    labelAmharic: "ዕቃ ተሳሰረ",
     labelEnglish: "Item Clause Bound",
     action: `Binding item ${itemNumber} to policy clause`,
     result: `Bound to ${clauseId} from "${documentName}" (p.${pageNumber})`,
@@ -459,7 +433,6 @@ export const createTraceEvent = {
 
   citationValidated: (itemNumber: number, isValid: boolean, missingFields?: string[]): Omit<TraceEvent, "id" | "timestamp"> => ({
     type: "citation_validated",
-    labelAmharic: "ጥቅስ ተረጋገጠ",
     labelEnglish: "Citation Validated",
     action: `Validating citation completeness for item ${itemNumber}`,
     result: isValid 

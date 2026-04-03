@@ -71,7 +71,7 @@ const EvidenceChip = ({ evidence, variant = "default", className }: EvidenceChip
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-primary" />
-            <span>የፖሊሲ ማጣቀሻ (Policy Citation)</span>
+            <span>Policy Citation</span>
           </SheetTitle>
         </SheetHeader>
 
@@ -104,7 +104,7 @@ const EvidenceChip = ({ evidence, variant = "default", className }: EvidenceChip
           {/* Quote Section */}
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              ጥቅስ (Quote)
+              Quote
             </p>
             <blockquote className="border-l-4 border-primary pl-4 py-2 bg-muted/50 rounded-r-lg">
               <p className="text-sm italic leading-relaxed">"{evidence.quote}"</p>
@@ -115,7 +115,7 @@ const EvidenceChip = ({ evidence, variant = "default", className }: EvidenceChip
           {evidence.relevance && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                ለምን አስፈላጊ ነው (Why It Matters)
+                Why It Matters
               </p>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {evidence.relevance}
@@ -127,7 +127,7 @@ const EvidenceChip = ({ evidence, variant = "default", className }: EvidenceChip
           {evidence.itemName && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                ለ (Applied To)
+                Applied To
               </p>
               <Badge variant="secondary" className="text-sm">
                 {evidence.itemName}
@@ -138,10 +138,7 @@ const EvidenceChip = ({ evidence, variant = "default", className }: EvidenceChip
           {/* Footer Note */}
           <div className="pt-4 border-t">
             <p className="text-xs text-muted-foreground">
-              ይህን ጥቅስ በመጀመሪያው ሰነድ ውስጥ ማረጋገጥ ይችላሉ። ገጽ {evidence.pageNumber} ይመልከቱ።
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              (You can verify this citation in the original document. See page {evidence.pageNumber}.)
+              You can verify this citation in the original document. See page {evidence.pageNumber}.
             </p>
           </div>
         </div>

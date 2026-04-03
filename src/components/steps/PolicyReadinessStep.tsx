@@ -28,7 +28,7 @@ interface PolicyReadinessStepProps {
  * - Policy Library cards
  * - Readiness meters
  * - Document Comprehension Gate
- * 
+ *
  * Does NOT show:
  * - Executive Summary
  * - Eligibility labels
@@ -40,17 +40,16 @@ const PolicyReadinessStep = ({
   children,
 }: PolicyReadinessStepProps) => {
   const totalDocs = policyDocuments.length;
-  const activeDocs = policyDocuments.filter((d) => d.status === "active").length;
   const hasCapitalGoodsList = policyDocuments.some((d) => d.capitalGoodsListPresent);
-  
+
   // Calculate readiness score
   const readinessItems = [
-    { label: "Policy Documents Loaded", labelAmharic: "የፖሊሲ ሰነዶች ተጫኑ", done: totalDocs > 0 },
-    { label: "Articles Indexed", labelAmharic: "አንቀጾች ተዘረዘሩ", done: policyDocuments.some((d) => (d.articlesIndexed ?? 0) > 0) },
-    { label: "Annexes Detected", labelAmharic: "አባሪዎች ተገኙ", done: policyDocuments.some((d) => (d.annexesDetected?.length ?? 0) > 0) },
-    { label: "Capital Goods List Found", labelAmharic: "የካፒታል ዕቃዎች ዝርዝር ተገኘ", done: hasCapitalGoodsList },
+    { label: "Policy Documents Loaded", done: totalDocs > 0 },
+    { label: "Articles Indexed", done: policyDocuments.some((d) => (d.articlesIndexed ?? 0) > 0) },
+    { label: "Annexes Detected", done: policyDocuments.some((d) => (d.annexesDetected?.length ?? 0) > 0) },
+    { label: "Capital Goods List Found", done: hasCapitalGoodsList },
   ];
-  
+
   const readinessScore = (readinessItems.filter((r) => r.done).length / readinessItems.length) * 100;
 
   return (
@@ -62,9 +61,9 @@ const PolicyReadinessStep = ({
             <BookOpen className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold">የፖሊሲ ዝግጁነት (Policy Readiness)</h2>
+            <h2 className="text-2xl font-bold">Policy Readiness</h2>
             <p className="text-sm text-muted-foreground">
-              ከመቀጠልዎ በፊት የፖሊሲ ቤተ-መጽሐፍት ዝግጁ መሆኑን ያረጋግጡ
+              Verify policy library is ready before proceeding to case analysis
             </p>
           </div>
         </div>
@@ -76,7 +75,7 @@ const PolicyReadinessStep = ({
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <FileCheck className="h-5 w-5 text-primary" />
-              የፖሊሲ ማረጋገጫ (Policy Verification)
+              Policy Verification
             </CardTitle>
             <Badge
               variant="outline"
@@ -88,7 +87,7 @@ const PolicyReadinessStep = ({
                     : "bg-muted text-muted-foreground"
               )}
             >
-              {Math.round(readinessScore)}% ዝግጁ
+              {Math.round(readinessScore)}% Ready
             </Badge>
           </div>
           <CardDescription>
@@ -118,17 +117,16 @@ const PolicyReadinessStep = ({
                 )}
                 <div className="flex-1">
                   <p className={cn("text-sm font-medium", item.done ? "text-success" : "text-muted-foreground")}>
-                    {item.labelAmharic}
+                    {item.label}
                   </p>
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
                 </div>
                 {item.done ? (
                   <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs">
-                    ✓ ተጠናቋል
+                    ✓ Complete
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-muted-foreground text-xs">
-                    ይጠበቃል
+                    Pending
                   </Badge>
                 )}
               </div>
@@ -141,7 +139,7 @@ const PolicyReadinessStep = ({
               <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-warning">
-                  የካፒታል ዕቃዎች ዝርዝር አልተገኘም (Capital Goods List Missing)
+                  Capital Goods List Missing
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Admin must upload policy documents containing the capital goods list before analysis can proceed.
@@ -159,7 +157,7 @@ const PolicyReadinessStep = ({
       <div className="flex items-center gap-2 p-4 rounded-lg bg-muted/30 border border-border text-sm text-muted-foreground">
         <Lock className="h-4 w-4 shrink-0" />
         <span>
-          <span className="font-medium">ማሳሰቢያ:</span> በዚህ ደረጃ ምንም ውሳኔ አይደረግም። (No conclusions are made at this stage.)
+          <span className="font-medium">Note:</span> No conclusions are made at this stage.
         </span>
       </div>
     </div>

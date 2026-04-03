@@ -440,7 +440,7 @@ const PolicyLibrary = () => {
                           <Label htmlFor="nameAmharic">Document Name (Amharic)</Label>
                           <Input
                             id="nameAmharic"
-                            placeholder="የኢንቨስትመንት ማበረታቻ መመሪያ"
+                            placeholder="Investment Incentive Guidelines"
                             value={uploadForm.nameAmharic}
                             onChange={(e) => setUploadForm({ ...uploadForm, nameAmharic: e.target.value })}
                           />

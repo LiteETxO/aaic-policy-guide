@@ -70,11 +70,11 @@ export function useAnalysisSessions() {
     onSuccess: (data) => {
       setCurrentSessionId(data.id);
       queryClient.invalidateQueries({ queryKey: ["analysis-sessions"] });
-      toast.success("ትንታኔ ተቀምጧል (Analysis saved)");
+      toast.success("Analysis saved");
     },
     onError: (error) => {
       console.error("Failed to save session:", error);
-      toast.error("ትንታኔን ማስቀመጥ አልተሳካም (Failed to save analysis)");
+      toast.error("Failed to save analysis");
     },
   });
 
@@ -102,7 +102,7 @@ export function useAnalysisSessions() {
     },
     onError: (error) => {
       console.error("Failed to update session:", error);
-      toast.error("ትንታኔን ማዘመን አልተሳካም (Failed to update analysis)");
+      toast.error("Failed to update analysis");
     },
   });
 
@@ -122,11 +122,11 @@ export function useAnalysisSessions() {
         setCurrentSessionId(null);
       }
       queryClient.invalidateQueries({ queryKey: ["analysis-sessions"] });
-      toast.success("ትንታኔ ተሰርዟል (Analysis deleted)");
+      toast.success("Analysis deleted");
     },
     onError: (error) => {
       console.error("Failed to delete session:", error);
-      toast.error("ትንታኔን መሰረዝ አልተሳካም (Failed to delete analysis)");
+      toast.error("Failed to delete analysis");
     },
   });
 

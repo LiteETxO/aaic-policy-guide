@@ -29,9 +29,6 @@ const HeroSection = () => {
             to determine capital goods compliance.
           </p>
 
-          <p className="text-base text-primary-foreground/60 mb-8 animate-fade-in">
-            የኢንቨስትመንት ፈቃዶችን እና ደረሰኞችን በትክክል ይተነትኑ
-          </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
             <Button variant="gold" size="xl" className="gap-2">

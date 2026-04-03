@@ -22,9 +22,9 @@ export const ReportExportActions = ({
     setExporting("pdf");
     try {
       await onExportPDF();
-      toast.success("ፒዲኤፍ ተጠናቀቀ (PDF exported successfully)");
+      toast.success("PDF exported successfully");
     } catch (error) {
-      toast.error("ፒዲኤፍ ማውጣት አልተሳካም (PDF export failed)");
+      toast.error("PDF export failed");
     } finally {
       setExporting(null);
     }
@@ -34,9 +34,9 @@ export const ReportExportActions = ({
     setExporting("docx");
     try {
       await onExportDOCX();
-      toast.success("ዎርድ ተጠናቀቀ (DOCX exported successfully)");
+      toast.success("DOCX exported successfully");
     } catch (error) {
-      toast.error("ዎርድ ማውጣት አልተሳካም (DOCX export failed)");
+      toast.error("DOCX export failed");
     } finally {
       setExporting(null);
     }
@@ -51,7 +51,7 @@ export const ReportExportActions = ({
         className="gap-2"
       >
         <Printer className="h-4 w-4" />
-        <span>አትም (Print)</span>
+        <span>Print</span>
       </Button>
       
       <Button 
@@ -66,7 +66,7 @@ export const ReportExportActions = ({
         ) : (
           <FileDown className="h-4 w-4" />
         )}
-        <span>ፒዲኤፍ (PDF)</span>
+        <span>PDF</span>
       </Button>
       
       <Button 
@@ -81,7 +81,7 @@ export const ReportExportActions = ({
         ) : (
           <FileText className="h-4 w-4" />
         )}
-        <span>ዎርድ (DOCX)</span>
+        <span>DOCX</span>
       </Button>
 
       {onEmail && (
@@ -92,7 +92,7 @@ export const ReportExportActions = ({
           className="gap-2"
         >
           <Mail className="h-4 w-4" />
-          <span>ኢሜል (Email)</span>
+          <span>Email</span>
         </Button>
       )}
     </div>

@@ -13,7 +13,6 @@ export interface ClassifiedError {
   category: ErrorCategory;
   code: string;
   message: string;
-  messageAmharic: string;
   isRetryable: boolean;
   stage: string;
   timestamp: number; // Use number instead of Date for serialization
@@ -125,7 +124,6 @@ export function classifyError(error: any, stage: string): ClassifiedError {
       category: "TRANSIENT_NETWORK",
       code: "NETWORK_TRANSIENT",
       message: "Temporary AI connection issue. Your progress is saved.",
-      messageAmharic: "የአይ ኔትዎርክ ግንኙነት ተቋርጧል",
       isRetryable: true,
       stage,
       timestamp: Date.now(),
@@ -149,7 +147,6 @@ export function classifyError(error: any, stage: string): ClassifiedError {
       category: "DATA_DOCUMENT",
       code: "DOCUMENT_ERROR",
       message: "Document processing error. Please check the uploaded files.",
-      messageAmharic: "የሰነድ ማስኬጃ ስህተት",
       isRetryable: false,
       stage,
       timestamp: Date.now(),
@@ -172,7 +169,6 @@ export function classifyError(error: any, stage: string): ClassifiedError {
       category: "LOGIC_CITATION",
       code: "CITATION_ERROR",
       message: "Policy clause retrieval issue. Admin action may be required.",
-      messageAmharic: "የፖሊሲ አንቀጽ ማስኬጃ ችግር",
       isRetryable: false,
       stage,
       timestamp: Date.now(),
@@ -185,7 +181,6 @@ export function classifyError(error: any, stage: string): ClassifiedError {
     category: "APPLICATION_BUG",
     code: "APP_ERROR",
     message: "An unexpected error occurred. Please try again.",
-    messageAmharic: "ያልተጠበቀ ስህተት ተከስቷል",
     isRetryable: true,
     stage,
     timestamp: Date.now(),

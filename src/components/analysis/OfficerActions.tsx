@@ -44,7 +44,7 @@ const OfficerActions = ({
     <TooltipProvider>
       <div className={cn("space-y-2", className)}>
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-2">
-          የመኮንን እርምጃዎች (Officer Actions)
+          Officer Actions
         </p>
         
         <div className="flex flex-wrap gap-2">
@@ -59,8 +59,7 @@ const OfficerActions = ({
                 className="gap-1.5"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">እንደ ካፒታል እቃ አጽድቅ</span>
-                <span className="sm:hidden">አጽድቅ</span>
+                Approve as Capital Good
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-xs">
@@ -83,8 +82,7 @@ const OfficerActions = ({
                 className="gap-1.5 border-warning/50 text-warning hover:bg-warning/10"
               >
                 <HelpCircle className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">ከአመልካች ማብራሪያ ጠይቅ</span>
-                <span className="sm:hidden">ማብራሪያ</span>
+                Request Clarification
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-xs">
@@ -108,8 +106,7 @@ const OfficerActions = ({
                   className="gap-1.5 border-destructive/50 text-destructive hover:bg-destructive/10"
                 >
                   <AlertTriangle className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">የፖሊሲ ክፍተት ለአለቃ አሳድግ</span>
-                  <span className="sm:hidden">አሳድግ</span>
+                  Escalate Policy Gap
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-xs">

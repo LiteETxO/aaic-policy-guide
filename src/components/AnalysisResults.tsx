@@ -251,31 +251,31 @@ const getItemConfidence = (item: ComplianceItem): ConfidenceLevel => {
   return "low";
 };
 
-// Eligibility status config (Amharic-first) - Updated with safety-focused language
+// Eligibility status config
 const eligibilityConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string; safeLabel?: string }> = {
-  "Eligible – Listed Capital Good": { icon: CheckCircle2, color: "text-success", label: "ብቁ - ዝርዝር (Eligible - Listed)", bgColor: "bg-success/10" },
-  "Eligible – Listed Capital Good (Mapped)": { icon: CheckCircle2, color: "text-success", label: "ብቁ - ተዛምዷል (Eligible - Mapped)", bgColor: "bg-success/10" },
-  "Eligible – Essential Capital Good (Not Listed)": { icon: CheckCircle2, color: "text-emerald-600", label: "ብቁ - አስፈላጊ (Eligible - Essential)", bgColor: "bg-emerald-500/10" },
-  "Decision Deferred — Citation Incomplete": { icon: AlertCircle, color: "text-warning", label: "ውሳኔ ተዘግቷል — ማስረጃ አልተሟላም (Citation Incomplete)", bgColor: "bg-warning/10" },
-  "Requires Clarification": { icon: HelpCircle, color: "text-blue-500", label: "ማብራሪያ ያስፈልጋል (Needs Clarification)", bgColor: "bg-blue-500/10" },
-  "Policy Gap – Admin Action Required": { icon: AlertOctagon, color: "text-destructive", label: "የፖሊሲ ክፍተት — አስተዳዳሪ እርምጃ ያስፈልጋል (Policy Gap)", bgColor: "bg-destructive/10" },
-  "Not Eligible": { icon: Shield, color: "text-destructive", label: "ውሳኔ ታግዷል — ማስረጃ ይጎድላል (Decision Blocked — Evidence Missing)", bgColor: "bg-destructive/10", safeLabel: "ተጨማሪ ማስረጃ ያስፈልጋል" },
+  "Eligible – Listed Capital Good": { icon: CheckCircle2, color: "text-success", label: "✅ ELIGIBLE — Listed Capital Good", bgColor: "bg-success/10" },
+  "Eligible – Listed Capital Good (Mapped)": { icon: CheckCircle2, color: "text-success", label: "✅ ELIGIBLE — Mapped Capital Good", bgColor: "bg-success/10" },
+  "Eligible – Essential Capital Good (Not Listed)": { icon: CheckCircle2, color: "text-emerald-600", label: "✅ ELIGIBLE — Essential Capital Good", bgColor: "bg-emerald-500/10" },
+  "Decision Deferred — Citation Incomplete": { icon: AlertCircle, color: "text-warning", label: "⚠️ REQUIRES REVIEW — Citation Incomplete", bgColor: "bg-warning/10" },
+  "Requires Clarification": { icon: HelpCircle, color: "text-blue-500", label: "⚠️ REQUIRES REVIEW — Needs Clarification", bgColor: "bg-blue-500/10" },
+  "Policy Gap – Admin Action Required": { icon: AlertOctagon, color: "text-destructive", label: "❌ EXCLUDED — Policy Gap", bgColor: "bg-destructive/10" },
+  "Not Eligible": { icon: Shield, color: "text-destructive", label: "❌ EXCLUDED", bgColor: "bg-destructive/10" },
 };
 
-// License alignment config (Amharic-first)
+// License alignment config
 const licenseConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string }> = {
-  "Aligned": { icon: CheckCircle2, color: "text-success", label: "ተስማምቷል (Aligned)", bgColor: "bg-success/10" },
-  "Conditional": { icon: AlertTriangle, color: "text-warning", label: "ቅድመ ሁኔታ (Conditional)", bgColor: "bg-warning/10" },
-  "Needs Clarification": { icon: HelpCircle, color: "text-blue-500", label: "ማብራሪያ ያስፈልጋል (Needs Clarification)", bgColor: "bg-blue-500/10" },
-  "Not Aligned": { icon: XCircle, color: "text-destructive", label: "አልተስማማም (Not Aligned)", bgColor: "bg-destructive/10" },
+  "Aligned": { icon: CheckCircle2, color: "text-success", label: "Aligned", bgColor: "bg-success/10" },
+  "Conditional": { icon: AlertTriangle, color: "text-warning", label: "Conditionally Aligned", bgColor: "bg-warning/10" },
+  "Needs Clarification": { icon: HelpCircle, color: "text-blue-500", label: "Alignment Needs Clarification", bgColor: "bg-blue-500/10" },
+  "Not Aligned": { icon: XCircle, color: "text-destructive", label: "Not Aligned", bgColor: "bg-destructive/10" },
 };
 
-// Legacy status config (Amharic-first)
+// Legacy status config
 const legacyStatusConfig: Record<string, { icon: React.ElementType; color: string; label: string; bgColor: string }> = {
-  "Compliant": { icon: CheckCircle2, color: "text-success", label: "ተገዢ (Compliant)", bgColor: "bg-success/10" },
-  "Conditional": { icon: AlertTriangle, color: "text-warning", label: "ቅድመ ሁኔታ (Conditional)", bgColor: "bg-warning/10" },
-  "Needs Clarification": { icon: HelpCircle, color: "text-blue-500", label: "ማብራሪያ ያስፈልጋል (Needs Clarification)", bgColor: "bg-blue-500/10" },
-  "Non-Compliant": { icon: XCircle, color: "text-destructive", label: "ተገዢ አይደለም (Non-Compliant)", bgColor: "bg-destructive/10" },
+  "Compliant": { icon: CheckCircle2, color: "text-success", label: "Compliant", bgColor: "bg-success/10" },
+  "Conditional": { icon: AlertTriangle, color: "text-warning", label: "Conditional", bgColor: "bg-warning/10" },
+  "Needs Clarification": { icon: HelpCircle, color: "text-blue-500", label: "Needs Clarification", bgColor: "bg-blue-500/10" },
+  "Non-Compliant": { icon: XCircle, color: "text-destructive", label: "Non-Compliant", bgColor: "bg-destructive/10" },
 };
 
 const EligibilityBadge = ({ status }: { status?: string }) => {
@@ -434,7 +434,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <AlertOctagon className="h-5 w-5 text-destructive" />
-                <CardTitle className="text-lg">የትንተና ውጤት ማሳየት አልተቻለም (Render Failed)</CardTitle>
+                <CardTitle className="text-lg">Report Render Failed</CardTitle>
               </div>
               <CardDescription>
                 The backend returned an incomplete or malformed response. Please re-run the analysis.
@@ -712,10 +712,10 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
     // Check for missing required fields
     const missingFields: string[] = [];
     if (!licenseSnapshot?.licensedActivity && !licenseUnderstanding?.licensedActivity) {
-      missingFields.push("የፍቃድ ስም / ተግባር (License Name / Activity)");
+      missingFields.push("License Name / Activity");
     }
     if (!guidelineMappingData || guidelineMappingData.mappingStatus === "not_found") {
-      missingFields.push("የፖሊሲ መመሪያ ካርታ (Policy Guideline Mapping)");
+      missingFields.push("Policy Guideline Mapping");
     }
     
     const firstSection = guidelineMappingData?.matchedSections?.[0];
@@ -755,7 +755,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
 
   // Build Goods Interpretation Table Data
   const goodsInterpretationRows = useMemo((): GoodsInterpretationRow[] => {
-    return complianceItems.map((item: ComplianceItem & { itemClassification?: string; systemAssociation?: string; systemAssociationAmharic?: string }): GoodsInterpretationRow => {
+    return complianceItems.map((item: ComplianceItem & { itemClassification?: string; systemAssociation?: string }): GoodsInterpretationRow => {
       const firstCitation = item.citations?.[0];
       
       // Determine interpretation type based on matchResult
@@ -811,7 +811,6 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
       
       // Spec 4️⃣: Use AI-provided systemAssociation first, fallback to derivation
       let systemAssociation: string | undefined = (item as any).systemAssociation;
-      let systemAssociationAmharic: string | undefined = (item as any).systemAssociationAmharic;
       
       // Only derive if AI didn't provide system association
       if (!systemAssociation) {
@@ -820,25 +819,19 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
         if (lowerName.includes("transform") || lowerName.includes("switch") || lowerName.includes("breaker") || 
             lowerName.includes("cable") || lowerName.includes("panel") || lowerName.includes("meter")) {
           systemAssociation = "Power Distribution System";
-          systemAssociationAmharic = "የኃይል ስርጭት ስርዓት";
         } else if (lowerName.includes("cool") || lowerName.includes("hvac") || lowerName.includes("chiller") ||
                    lowerName.includes("air condition") || lowerName.includes("refriger")) {
           systemAssociation = "Cooling / HVAC System";
-          systemAssociationAmharic = "የማቀዝቀዣ / HVAC ስርዓት";
         } else if (lowerName.includes("server") || lowerName.includes("network") || lowerName.includes("router") ||
                    lowerName.includes("storage") || lowerName.includes("rack")) {
           systemAssociation = "IT Infrastructure";
-          systemAssociationAmharic = "የአይቲ መሠረተ ልማት";
         } else if (lowerName.includes("generator") || lowerName.includes("ups") || lowerName.includes("battery")) {
           systemAssociation = "Power Generation / Backup";
-          systemAssociationAmharic = "የኃይል ማመንጫ / ማስቀመጫ";
         } else if (lowerName.includes("fire") || lowerName.includes("suppression") || lowerName.includes("alarm")) {
           systemAssociation = "Fire Safety System";
-          systemAssociationAmharic = "የእሳት ደህንነት ስርዓት";
         } else if (lowerName.includes("security") || lowerName.includes("access") || lowerName.includes("cctv") ||
                    lowerName.includes("camera")) {
           systemAssociation = "Security / Access Control";
-          systemAssociationAmharic = "የደህንነት / መግቢያ ቁጥጥር";
         }
       }
       
@@ -847,7 +840,6 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
         invoiceDescription: item.invoiceItem, // Original, NOT translated
         normalizedName: item.normalizedName || item.invoiceItem || "Item",
         systemAssociation,
-        systemAssociationAmharic,
         itemClassification,
         matchedClause: firstCitation ? {
           documentName: firstCitation.documentName,
@@ -913,7 +905,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
       <section className="py-16 bg-muted/20">
         <div className="container">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-3">የትንተና ውጤቶች (Analysis Results)</h2>
+            <h2 className="text-3xl font-bold mb-3">Analysis Results</h2>
             <p className="text-muted-foreground">Analysis produced no results</p>
           </div>
 
@@ -921,7 +913,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-warning" />
-                <CardTitle className="text-lg">ባዶ ትንተና ውጤት (Empty Analysis)</CardTitle>
+                <CardTitle className="text-lg">Empty Analysis Result</CardTitle>
               </div>
               <CardDescription>
                 The AI analysis completed but returned no items. This usually means:
@@ -1043,7 +1035,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
               className="gap-2"
             >
               <LayoutList className="h-4 w-4" />
-              <span>ወደ ተግባራዊ እይታ ተመለስ (Back to Interactive View)</span>
+              <span>Back to Interactive View</span>
             </Button>
           </div>
           
@@ -1057,11 +1049,10 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
     <section className="py-16 bg-muted/20">
       <div className="container">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">የትንተና ውጤቶች (Analysis Results)</h2>
+          <h2 className="text-3xl font-bold mb-3">Analysis Results</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            በፖሊሲ ላይ የተመሰረተ የብቁነት ግምገማ ከሊከታተሉ የሚችሉ ማጣቀሻዎች ጋር
+            Policy-anchored compliance assessment with traceable citations
           </p>
-          <p className="text-sm text-muted-foreground mt-2">(Policy-anchored compliance assessment with traceable citations)</p>
           
           {/* Button to generate formal report */}
           <div className="mt-6">
@@ -1070,7 +1061,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
               className="gap-2 gradient-hero text-primary-foreground"
             >
               <FileOutput className="h-4 w-4" />
-              <span>ሪፖርት ያውርዱ / ያትሙ (Generate Formal Report)</span>
+              <span>Generate Formal Report</span>
             </Button>
           </div>
         </div>
@@ -1104,17 +1095,17 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                 ) : (
                   <FileWarning className="h-5 w-5 text-destructive" />
                 )}
-                <CardTitle className="text-lg">የሰነድ ግንዛቤ መግቢያ (Document Comprehension Gate)</CardTitle>
-                <Badge 
-                  variant="outline" 
+                <CardTitle className="text-lg">Document Comprehension Gate</CardTitle>
+                <Badge
+                  variant="outline"
                   className={cn(
                     "ml-2",
-                    documentComprehension.gateStatus === "PASSED" 
-                      ? "bg-success/10 text-success border-success/30" 
+                    documentComprehension.gateStatus === "PASSED"
+                      ? "bg-success/10 text-success border-success/30"
                       : "bg-destructive/10 text-destructive border-destructive/30"
                   )}
                 >
-                  {documentComprehension.gateStatus === "PASSED" ? "አልፏል (PASSED)" : "ታግዷል (BLOCKED)"}
+                  {documentComprehension.gateStatus === "PASSED" ? "PASSED" : "BLOCKED"}
                 </Badge>
               </div>
               {documentComprehension.blockedReason && (
@@ -1133,7 +1124,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
               <div>
                 <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
-                  የተነበቡ ሰነዶች (Documents Read)
+                  Documents Read
                   {documentsRead.length > 0 && <span>({documentsRead.length})</span>}
                 </h5>
                 {documentsRead.length > 0 ? (
@@ -1174,17 +1165,17 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                         )}
                         {doc.capitalGoodsListPresent === true && (
                           <Badge variant="outline" className="text-xs text-success bg-success/10">
-                            ካፒታል ዕቃዎች ዝርዝር (Capital Goods List) ✓
+                            Capital Goods List ✓
                           </Badge>
                         )}
                         {doc.annexesDetected && doc.annexesDetected.length > 0 && (
                           <div className="w-full mt-1 pl-6 text-xs text-muted-foreground">
-                            አባሪዎች (Annexes): {doc.annexesDetected.join(", ")}
+                            Annexes: {doc.annexesDetected.join(", ")}
                           </div>
                         )}
                         {doc.keySectionsDetected && doc.keySectionsDetected.length > 0 && (
                           <div className="w-full mt-1 pl-6 text-xs text-muted-foreground">
-                            ቁልፍ ክፍሎች (Key sections): {doc.keySectionsDetected.join(", ")}
+                            Key sections: {doc.keySectionsDetected.join(", ")}
                           </div>
                         )}
                       </div>
@@ -1194,13 +1185,10 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                   <div className="p-4 rounded bg-warning/10 border border-warning/30 text-sm">
                     <div className="flex items-center gap-2 mb-2">
                       <AlertTriangle className="h-4 w-4 text-warning" />
-                      <span className="font-medium text-warning">የሰነድ ዝርዝር አልተገኘም (Document list not provided)</span>
+                      <span className="font-medium text-warning">Document list not provided</span>
                     </div>
                     <p className="text-muted-foreground">
-                      የተነበቡ ሰነዶች ዝርዝር በትንተና ውጤት ውስጥ አልተሰጠም። ይህ የኦዲት እና የማስረጃ ክትትል ጥራት ሊቀንስ ይችላል።
-                    </p>
-                    <p className="text-muted-foreground mt-2">
-                      The backend did not include a detailed list of documents read. This reduces traceability.
+                      The backend did not include a detailed list of documents read. This reduces audit traceability.
                     </p>
                   </div>
                 )}
@@ -1209,10 +1197,10 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
               {/* License Understanding */}
               {documentComprehension.licenseUnderstanding && (
                 <div className="p-3 rounded bg-muted/30 border">
-                  <h6 className="text-xs font-semibold text-muted-foreground uppercase mb-2">የፍቃድ ግንዛቤ (License Understanding)</h6>
-                  <p className="text-sm"><strong>ተግባር (Activity):</strong> {documentComprehension.licenseUnderstanding.licensedActivity}</p>
+                  <h6 className="text-xs font-semibold text-muted-foreground uppercase mb-2">License Understanding</h6>
+                  <p className="text-sm"><strong>Activity:</strong> {documentComprehension.licenseUnderstanding.licensedActivity}</p>
                   {documentComprehension.licenseUnderstanding.scopeLimitations && (
-                    <p className="text-sm text-muted-foreground"><strong>ወሰን (Scope):</strong> {documentComprehension.licenseUnderstanding.scopeLimitations}</p>
+                    <p className="text-sm text-muted-foreground"><strong>Scope:</strong> {documentComprehension.licenseUnderstanding.scopeLimitations}</p>
                   )}
                 </div>
               )}
@@ -1220,10 +1208,10 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
               {/* Invoice Understanding */}
               {documentComprehension.invoiceUnderstanding && (
                 <div className="flex gap-4 text-sm">
-                  <span><strong>{documentComprehension.invoiceUnderstanding.totalLineItems}</strong> ዕቃዎች (line items)</span>
-                  <span><strong>{documentComprehension.invoiceUnderstanding.itemsWithSpecs}</strong> ዝርዝር ያላቸው (with specs)</span>
+                  <span><strong>{documentComprehension.invoiceUnderstanding.totalLineItems}</strong> line items</span>
+                  <span><strong>{documentComprehension.invoiceUnderstanding.itemsWithSpecs}</strong> with specs</span>
                   {documentComprehension.invoiceUnderstanding.ambiguousItems > 0 && (
-                    <span className="text-warning"><strong>{documentComprehension.invoiceUnderstanding.ambiguousItems}</strong> ግልጽ ያልሆኑ (ambiguous)</span>
+                    <span className="text-warning"><strong>{documentComprehension.invoiceUnderstanding.ambiguousItems}</strong> ambiguous</span>
                   )}
                 </div>
               )}
@@ -1247,35 +1235,26 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
               <div className="flex items-center gap-2">
                 <AlertOctagon className="h-5 w-5 text-warning" />
                 <CardTitle className="text-lg text-warning">
-                  ያልተተነተኑ ዕቃዎች ተገኝተዋል (Incomplete Analysis Detected)
+                  Incomplete Analysis Detected
                 </CardTitle>
                 <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
-                  {analyzedItems}/{totalInvoiceItems} ዕቃዎች (items)
+                  {analyzedItems}/{totalInvoiceItems} items
                 </Badge>
               </div>
               <CardDescription>
-                ከጠቅላላ {totalInvoiceItems} የደረሰኝ ዕቃዎች ውስጥ {analyzedItems} ብቻ ተተንትነዋል። 
-                (Only {analyzedItems} out of {totalInvoiceItems} invoice items were analyzed.)
+                Only {analyzedItems} out of {totalInvoiceItems} invoice items were analyzed.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
-                <p className="text-sm font-medium text-warning mb-2">
-                  ⚠️ ማስጠንቀቂያ (Warning):
-                </p>
                 <p className="text-sm text-muted-foreground">
-                  አንዳንድ ዕቃዎች ሊታለፉ ወይም ሊቧደኑ ይችላሉ። ለተሟላ ትንተና ድጋሚ ይሞክሩ።
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  (Some items may have been skipped or grouped. Consider re-running for complete analysis.)
+                  Some items may have been skipped or grouped. Consider re-running for complete analysis.
                 </p>
               </div>
               
               {skippedItems.length > 0 && (
                 <div>
-                  <h5 className="text-sm font-semibold mb-2 text-warning">
-                    ያልተተነተኑ ዕቃዎች (Skipped Items):
-                  </h5>
+                  <h5 className="text-sm font-semibold mb-2 text-warning">Skipped Items:</h5>
                   <ul className="space-y-1">
                     {skippedItems.map((item, i) => (
                       <li key={i} className="text-sm flex items-center gap-2">
@@ -1296,9 +1275,9 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2">
                 <Scale className="h-5 w-5 text-primary" />
-                <CardTitle>የማስፈጸሚያ ማጠቃለያ (Executive Decision Summary)</CardTitle>
+                <CardTitle>Executive Decision Summary</CardTitle>
               </div>
-              <CardDescription>ለባለስልጣን ግምገማ ከፍተኛ ደረጃ ግምገማ (High-level assessment for officer review)</CardDescription>
+              <CardDescription>High-level assessment for officer review</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-4 gap-4">
@@ -1306,19 +1285,19 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                   <p className={cn("text-xl font-bold mb-1", getOverallStatusColor())}>
                     {executiveSummary.overallStatus}
                   </p>
-                  <p className="text-xs text-muted-foreground">አጠቃላይ ሁኔታ (Overall Status)</p>
+                  <p className="text-xs text-muted-foreground">Overall Status</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-success/10 border border-success/20">
                   <p className="text-2xl font-bold text-success mb-1">{eligibleCount}</p>
-                  <p className="text-xs text-muted-foreground">ብቁ (Eligible)</p>
+                  <p className="text-xs text-muted-foreground">Eligible</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-warning/10 border border-warning/20">
                   <p className="text-2xl font-bold text-warning mb-1">{clarificationCount}</p>
-                  <p className="text-xs text-muted-foreground">ግምገማ ያስፈልጋል (Need Review)</p>
+                  <p className="text-xs text-muted-foreground">Needs Review</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-destructive/10 border border-destructive/20">
                   <p className="text-2xl font-bold text-destructive mb-1">{notEligibleCount}</p>
-                  <p className="text-xs text-muted-foreground">ብቁ አይደለም (Not Eligible)</p>
+                  <p className="text-xs text-muted-foreground">Not Eligible</p>
                 </div>
               </div>
 
@@ -1326,7 +1305,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 text-warning" />
-                    ዋና ጉዳዮች (Top Issues)
+                    Top Issues
                   </h4>
                   <ul className="space-y-2">
                     {executiveSummary.topIssues.map((issue, index) => (
@@ -1343,7 +1322,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold flex items-center gap-2">
                     <HelpCircle className="h-4 w-4 text-blue-500" />
-                    ተጨማሪ መረጃ ያስፈልጋል (Additional Information Needed)
+                    Additional Information Needed
                   </h4>
                   <ul className="space-y-2">
                     {executiveSummary.additionalInfoNeeded.map((info, index) => (
@@ -1365,28 +1344,28 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">የፍቃድ ማጠቃለያ (License Snapshot)</CardTitle>
+                <CardTitle className="text-lg">License Snapshot</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">የተፈቀደ ተግባር (Licensed Activity)</p>
-                  <p className="text-sm font-medium">{licenseSnapshot.licensedActivity || "አልተገለጸም (Not specified)"}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Licensed Activity</p>
+                  <p className="text-sm font-medium">{licenseSnapshot.licensedActivity || "Not specified"}</p>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">ዘርፍ (Sector)</p>
-                  <p className="text-sm font-medium">{licenseSnapshot.sector || "አልተገለጸም (Not specified)"}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sector</p>
+                  <p className="text-sm font-medium">{licenseSnapshot.sector || "Not specified"}</p>
                 </div>
                 {licenseSnapshot.licenseNumber && (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">የፍቃድ ቁጥር (License Number)</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">License Number</p>
                     <p className="text-sm font-mono">{licenseSnapshot.licenseNumber}</p>
                   </div>
                 )}
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">ወሰን/ገደቦች (Scope/Restrictions)</p>
-                  <p className="text-sm text-muted-foreground">{licenseSnapshot.restrictions || licenseSnapshot.scopeOfOperation || "አልተገለጸም (None specified)"}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Scope / Restrictions</p>
+                  <p className="text-sm text-muted-foreground">{licenseSnapshot.restrictions || licenseSnapshot.scopeOfOperation || "None specified"}</p>
                 </div>
               </div>
             </CardContent>
@@ -1408,9 +1387,9 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 text-primary" />
-                <CardTitle>የዕቃዎች ብቁነት ሰንጠረዥ (Itemized Compliance Table)</CardTitle>
+                <CardTitle>Itemized Compliance Table</CardTitle>
               </div>
-              <CardDescription>ማጣቀሻዎችን እና ዝርዝር ምክንያቶችን ለማየት ማንኛውንም ረድፍ ጠቅ ያድርጉ (Click any row to view citations and detailed reasoning)</CardDescription>
+              <CardDescription>Click any row to view citations and detailed reasoning</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border overflow-hidden">
@@ -1418,12 +1397,12 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="w-10"></TableHead>
-                      <TableHead className="font-semibold">ቁጥር (Item #)</TableHead>
-                      <TableHead className="font-semibold">የደረሰኝ ዕቃ (Invoice Item)</TableHead>
-                      <TableHead className="font-semibold">መደበኛ ስም (Normalized Name)</TableHead>
-                      <TableHead className="font-semibold">እምነት (Confidence)</TableHead>
-                      <TableHead className="font-semibold">የፍቃድ ማስማማት (License Align.)</TableHead>
-                      <TableHead className="font-semibold">ብቁነት (Eligibility)</TableHead>
+                      <TableHead className="font-semibold">Item #</TableHead>
+                      <TableHead className="font-semibold">Invoice Item</TableHead>
+                      <TableHead className="font-semibold">Normalized Name</TableHead>
+                      <TableHead className="font-semibold">Confidence</TableHead>
+                      <TableHead className="font-semibold">License Alignment</TableHead>
+                      <TableHead className="font-semibold">Eligibility</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1460,7 +1439,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                                   <div>
                                     <h5 className="text-sm font-semibold mb-2 flex items-center gap-2">
                                       <FileText className="h-4 w-4 text-primary" />
-                                      የፍቃድ ማስረጃ (License Evidence)
+                                      License Evidence
                                     </h5>
                                     <p className="text-sm text-muted-foreground bg-background p-3 rounded border">
                                       {item.licenseEvidence}
@@ -1473,7 +1452,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                                   <div>
                                     <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
                                       <BookOpen className="h-4 w-4 text-primary" />
-                                      የፖሊሲ ማጣቀሻዎች (Policy Citations) ({item.citations.length})
+                                      Policy Citations ({item.citations.length})
                                     </h5>
                                     <div className="space-y-3">
                                       {item.citations.map((citation, i) => (
@@ -1488,7 +1467,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                                   <div>
                                     <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
                                       <Scale className="h-4 w-4 text-primary" />
-                                      ምክንያት (Reasoning)
+                                      Reasoning
                                     </h5>
                                     <ul className="space-y-2">
                                       {item.reasoning.map((r, i) => (
@@ -1522,9 +1501,9 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-primary" />
-                <CardTitle>ማስረጃ እና ማጣቀሻዎች (Evidence & Citations Panel)</CardTitle>
+                <CardTitle>Evidence & Citations Panel</CardTitle>
               </div>
-              <CardDescription>በዚህ ትንተና ውስጥ የተጠቀሱ ሁሉም የፖሊሲ አንቀጾች (All policy clauses referenced in this analysis)</CardDescription>
+              <CardDescription>All policy clauses referenced in this analysis</CardDescription>
             </CardHeader>
             <CardContent>
               <Accordion type="multiple" className="space-y-2">
@@ -1550,7 +1529,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                         <div className="flex items-start gap-2 text-sm">
                           <ExternalLink className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                           <div>
-                            <span className="font-medium">ለ (Applied to): </span>
+                            <span className="font-medium">Applied to: </span>
                             <span className="text-muted-foreground">{citation.itemName}</span>
                           </div>
                         </div>
@@ -1570,9 +1549,9 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2">
                 <AlertOctagon className="h-5 w-5 text-warning" />
-                <CardTitle>የባለስልጣን እርምጃ ያስፈልጋል (Officer Action Needed)</CardTitle>
+                <CardTitle>Officer Action Needed</CardTitle>
               </div>
-              <CardDescription>ተጨማሪ ማረጋገጫ ወይም ሰነድ የሚያስፈልጋቸው ዕቃዎች (Items requiring additional verification or documentation)</CardDescription>
+              <CardDescription>Items requiring additional verification or documentation</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -1623,13 +1602,10 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                 <AlertCircle className="h-5 w-5 text-primary-foreground" />
               </div>
               <div>
-                <h4 className="font-semibold mb-1">የምክር ማስታወቂያ — ትርጓሜ አስገዳጅ አይደለም (Advisory Notice — Interpretation is Non-Binding)</h4>
+                <h4 className="font-semibold mb-1">Advisory Notice — Interpretation is Non-Binding</h4>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  ይህ ትንተና የውሳኔ ድጋፍ ብቻ ነው። ሁሉም ማጣቀሻዎች ሊከታተሉ ይችላሉ። የመጨረሻ ስልጣን ከAAIC ባለስልጣን ጋር ነው።
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  (This analysis is grounded strictly in the configured Policy Library and uploaded case documents. 
-                  Every compliance statement includes traceable citations. Final authority rests with the AAIC officer.)
+                  This analysis is grounded strictly in the configured Policy Library and uploaded case documents.
+                  Every compliance statement includes traceable citations. Final authority rests with the AAIC officer.
                 </p>
               </div>
             </CardContent>

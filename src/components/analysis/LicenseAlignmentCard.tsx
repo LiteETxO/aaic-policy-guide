@@ -19,35 +19,30 @@ const statusConfig: Record<AlignmentStatus, {
   color: string;
   bgColor: string;
   label: string;
-  labelAmharic: string;
 }> = {
   Aligned: {
     icon: CheckCircle2,
     color: "text-success",
     bgColor: "bg-success/10 border-success/30",
     label: "Aligned with Licensed Activity",
-    labelAmharic: "ከፈቃድ እንቅስቃሴ ጋር ተስማምቷል",
   },
   Conditional: {
     icon: AlertTriangle,
     color: "text-warning",
     bgColor: "bg-warning/10 border-warning/30",
     label: "Conditionally Aligned",
-    labelAmharic: "በሁኔታ ተስማምቷል",
   },
   "Needs Clarification": {
     icon: HelpCircle,
     color: "text-primary",
     bgColor: "bg-primary/10 border-primary/30",
     label: "Alignment Needs Clarification",
-    labelAmharic: "ማብራሪያ ያስፈልጋል",
   },
   "Not Aligned": {
     icon: XCircle,
     color: "text-destructive",
     bgColor: "bg-destructive/10 border-destructive/30",
     label: "Not Aligned",
-    labelAmharic: "አልተስማማም",
   },
 };
 
