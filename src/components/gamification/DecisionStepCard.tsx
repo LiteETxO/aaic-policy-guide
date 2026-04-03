@@ -107,9 +107,8 @@ const DecisionStepCard = ({ data, className }: DecisionStepCardProps) => {
                     step.status === "locked" && "text-muted-foreground",
                     step.status === "error" && "text-destructive"
                   )}>
-                    {step.labelAmharic}
+                    {step.labelEnglish}
                   </p>
-                  <p className="text-xs text-muted-foreground">{step.labelEnglish}</p>
                   {step.result && step.status === "complete" && (
                     <p className="text-xs text-success mt-0.5">{step.result}</p>
                   )}
@@ -138,10 +137,7 @@ const DecisionStepCard = ({ data, className }: DecisionStepCardProps) => {
                 <XCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
               )}
               <div>
-                <p className="text-sm font-semibold">{data.finalDecisionAmharic || data.finalDecision}</p>
-                {data.finalDecisionAmharic && (
-                  <p className="text-xs text-muted-foreground">{data.finalDecision}</p>
-                )}
+                <p className="text-sm font-semibold">{data.finalDecision}</p>
               </div>
             </div>
           </div>
@@ -151,7 +147,7 @@ const DecisionStepCard = ({ data, className }: DecisionStepCardProps) => {
         {data.citations && data.citations.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              ማስረጃዎች (Evidence)
+              Evidence
             </p>
             <div className="flex flex-wrap gap-2">
               {data.citations.slice(0, 3).map((citation, idx) => (

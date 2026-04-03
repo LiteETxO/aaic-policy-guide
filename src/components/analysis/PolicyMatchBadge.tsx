@@ -51,7 +51,7 @@ const config: Record<PolicyMatchStatus, {
 };
 
 const PolicyMatchBadge = ({ status, className }: PolicyMatchBadgeProps) => {
-  const { icon: Icon, label, labelAmharic, color, bgColor } = config[status];
+  const { icon: Icon, label, color, bgColor } = config[status];
 
   return (
     <Badge 
@@ -64,10 +64,7 @@ const PolicyMatchBadge = ({ status, className }: PolicyMatchBadgeProps) => {
       )}
     >
       <Icon className="h-3.5 w-3.5" />
-      <span className="flex flex-col leading-tight">
-        <span className="text-xs">{labelAmharic}</span>
-        <span className="text-[10px] opacity-80">{label}</span>
-      </span>
+      <span className="text-xs">{label}</span>
     </Badge>
   );
 };

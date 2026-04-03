@@ -65,9 +65,9 @@ const eventTypeConfig: Record<TraceEventType, {
 };
 
 const confidenceConfig: Record<TraceConfidence, { label: string; color: string }> = {
-  high: { label: "ከፍተኛ", color: "text-success" },
-  medium: { label: "መካከለኛ", color: "text-warning" },
-  low: { label: "ዝቅተኛ", color: "text-orange-500" },
+  high: { label: "High", color: "text-success" },
+  medium: { label: "Medium", color: "text-warning" },
+  low: { label: "Low", color: "text-orange-500" },
   none: { label: "—", color: "text-muted-foreground" },
 };
 
@@ -97,9 +97,8 @@ const TraceEventCard = ({ event, isLatest }: TraceEventCardProps) => {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium leading-tight">
-            {event.isBlocked && "🚫 "}{event.labelAmharic}
+            {event.isBlocked && "🚫 "}{event.labelEnglish}
           </p>
-          <p className="text-xs text-muted-foreground">({event.labelEnglish})</p>
         </div>
         {confidenceInfo && event.confidence !== "none" && (
           <Badge variant="outline" className={cn("text-xs shrink-0", confidenceInfo.color)}>
@@ -147,7 +146,7 @@ const TraceEventCard = ({ event, isLatest }: TraceEventCardProps) => {
       {event.nextAction && (
         <div className="mt-2 p-2 rounded bg-warning/10 border border-warning/20">
           <p className="text-xs text-warning font-medium">
-            ቀጣይ እርምጃ (Next Action):
+            Next Action:
           </p>
           <p className="text-xs text-warning/80">{event.nextAction}</p>
         </div>
@@ -253,13 +252,12 @@ const DecisionTracePanel = ({ className }: DecisionTracePanelProps) => {
             ) : (
               <GitBranch className="h-4 w-4 text-primary" />
             )}
-            <span>የውሳኔ ዱካ</span>
+            <span>Decision Trace</span>
           </CardTitle>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={togglePanel}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">(Decision Trace)</p>
 
         {/* Stats Row */}
         <div className="flex gap-2 flex-wrap">
@@ -299,8 +297,7 @@ const DecisionTracePanel = ({ className }: DecisionTracePanelProps) => {
         {events.length === 0 ? (
           <div className="p-6 text-center text-muted-foreground">
             <GitBranch className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">ትንተና ሲጀመር የውሳኔ ዱካ እዚህ ይታያል</p>
-            <p className="text-xs mt-1">(Decision trace will appear here when analysis starts)</p>
+            <p className="text-sm">Decision trace will appear here when analysis starts</p>
           </div>
         ) : (
           <ScrollArea 

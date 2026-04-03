@@ -55,7 +55,7 @@ export function AnalysisHistoryPanel({
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <History className="h-4 w-4" />
-            ቀደሞ ትንታኔዎች (Previous Analyses)
+            Previous Analyses
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -73,14 +73,13 @@ export function AnalysisHistoryPanel({
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <History className="h-4 w-4" />
-            ቀደሞ ትንታኔዎች (Previous Analyses)
+            Previous Analyses
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-6 text-muted-foreground">
             <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">ቀደም ሲል የተደረጉ ትንታኔዎች የሉም</p>
-            <p className="text-xs">No previous analyses found</p>
+            <p className="text-sm">No previous analyses found</p>
           </div>
         </CardContent>
       </Card>
@@ -92,7 +91,7 @@ export function AnalysisHistoryPanel({
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <History className="h-4 w-4" />
-          ቀደሞ ትንታኔዎች (Previous Analyses)
+          Previous Analyses
           <Badge variant="secondary" className="ml-auto">
             {sessions.length}
           </Badge>
@@ -117,11 +116,11 @@ export function AnalysisHistoryPanel({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-medium truncate">
-                      ፍቃድ: {licenseId}
+                      License: {licenseId}
                     </span>
                     {isCurrentSession && (
                       <Badge variant="outline" className="text-xs">
-                        ንቁ (Active)
+                        Active
                       </Badge>
                     )}
                   </div>
@@ -130,12 +129,12 @@ export function AnalysisHistoryPanel({
                       <Clock className="h-3 w-3" />
                       {format(new Date(session.created_at), "MMM d, yyyy HH:mm")}
                     </span>
-                    <span>{itemCount} ዕቃዎች (items)</span>
+                    <span>{itemCount} items</span>
                     <Badge
                       variant={session.status === "complete" ? "default" : "secondary"}
                       className="text-xs"
                     >
-                      {session.status === "complete" ? "ተጠናቅቋል" : "በሂደት ላይ"}
+                      {session.status === "complete" ? "Complete" : "In Progress"}
                     </Badge>
                   </div>
                 </div>
@@ -148,7 +147,7 @@ export function AnalysisHistoryPanel({
                     className="h-8 px-2"
                   >
                     <Upload className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">ጫን</span>
+                    <span className="hidden sm:inline">Load</span>
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -163,25 +162,20 @@ export function AnalysisHistoryPanel({
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>ትንታኔውን ይሰርዙ?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete Analysis?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          ይህ እርምጃ ሊቀለበስ አይችልም። ትንታኔው እና ሁሉም ውጤቶቹ በቋሚነት
-                          ይሰረዛሉ።
-                          <br />
-                          <span className="text-xs">
-                            This action cannot be undone. The analysis and all its
-                            results will be permanently deleted.
-                          </span>
+                          This action cannot be undone. The analysis and all its
+                          results will be permanently deleted.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>ተው (Cancel)</AlertDialogCancel>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => onDeleteSession(session.id)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           disabled={isDeleting}
                         >
-                          {isDeleting ? "በመሰረዝ ላይ..." : "ሰርዝ (Delete)"}
+                          {isDeleting ? "Deleting..." : "Delete"}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -193,7 +187,7 @@ export function AnalysisHistoryPanel({
         })}
         {sessions.length > 5 && (
           <p className="text-xs text-center text-muted-foreground pt-2">
-            +{sessions.length - 5} ተጨማሪ ትንታኔዎች (more analyses)
+            +{sessions.length - 5} more analyses
           </p>
         )}
       </CardContent>

@@ -73,9 +73,6 @@ const LicenseAlignmentCard = ({
         <Icon className={cn("h-4 w-4 mt-0.5 shrink-0", config.color)} />
         <div>
           <p className={cn("text-sm font-semibold", config.color)}>
-            {config.labelAmharic}
-          </p>
-          <p className="text-xs text-muted-foreground">
             {config.label}
           </p>
         </div>
@@ -86,28 +83,20 @@ const LicenseAlignmentCard = ({
         <div className="flex items-start gap-2">
           <Building2 className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground">ፈቃድ (License):</p>
-            <p className="text-sm font-medium">{licenseNameAmharic || licenseName}</p>
-            {licenseNameAmharic && (
-              <p className="text-xs text-muted-foreground">{licenseName}</p>
-            )}
+            <p className="text-xs text-muted-foreground">License:</p>
+            <p className="text-sm font-medium">{licenseName}</p>
           </div>
         </div>
 
         {/* Functional Requirement */}
         <div className="p-2 rounded bg-background/50 border border-border/50">
           <p className="text-xs text-muted-foreground mb-1">
-            ተግባራዊ አስፈላጊነት (Functional Requirement):
+            Functional Requirement:
           </p>
           <p className="text-sm text-foreground">
             <span className="font-medium">{itemName}</span>{" "}
-            {functionalRequirementAmharic || functionalRequirement}
+            {functionalRequirement}
           </p>
-          {functionalRequirementAmharic && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {itemName} {functionalRequirement}
-            </p>
-          )}
         </div>
       </div>
     </div>

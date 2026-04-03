@@ -113,17 +113,13 @@ const ProgressMilestoneBar = ({ milestones, className }: ProgressMilestoneBarPro
                       {/* Label */}
                       <div className="text-center">
                         <p className={cn("text-xs font-semibold", config.textColor)}>
-                          {milestone.labelAmharic}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
                           {milestone.labelEnglish}
                         </p>
                       </div>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs">
-                    <p className="font-medium">{milestone.labelAmharic}</p>
-                    <p className="text-xs text-muted-foreground">{milestone.labelEnglish}</p>
+                    <p className="font-medium">{milestone.labelEnglish}</p>
                     {milestone.blockedReason && (
                       <p className="text-xs text-destructive mt-1">{milestone.blockedReason}</p>
                     )}

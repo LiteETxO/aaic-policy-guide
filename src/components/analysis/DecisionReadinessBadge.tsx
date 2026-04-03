@@ -60,7 +60,7 @@ const config: Record<DecisionReadiness, {
 };
 
 const DecisionReadinessBadge = ({ status, className, size = "md" }: DecisionReadinessBadgeProps) => {
-  const { icon: Icon, label, labelAmharic, color, bgColor } = config[status];
+  const { icon: Icon, label, color, bgColor } = config[status];
 
   return (
     <Badge 
@@ -74,10 +74,7 @@ const DecisionReadinessBadge = ({ status, className, size = "md" }: DecisionRead
       )}
     >
       <Icon className={cn("shrink-0", size === "sm" ? "h-3 w-3" : "h-4 w-4")} />
-      <span className={cn("flex flex-col leading-tight", size === "sm" && "text-[10px]")}>
-        <span className={size === "sm" ? "text-[10px]" : "text-xs font-semibold"}>{labelAmharic}</span>
-        <span className={cn("opacity-80", size === "sm" ? "text-[9px]" : "text-[10px]")}>{label}</span>
-      </span>
+      <span className={cn(size === "sm" ? "text-[10px]" : "text-xs font-semibold")}>{label}</span>
     </Badge>
   );
 };

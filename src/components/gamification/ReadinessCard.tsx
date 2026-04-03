@@ -66,8 +66,7 @@ const ReadinessCard = ({ titleAmharic, titleEnglish, icon: HeaderIcon, items, cl
               )} />
             </div>
             <div>
-              <CardTitle className="text-base">{titleAmharic}</CardTitle>
-              <p className="text-xs text-muted-foreground">{titleEnglish}</p>
+              <CardTitle className="text-base">{titleEnglish}</CardTitle>
             </div>
           </div>
           <div className="text-right">
@@ -106,9 +105,8 @@ const ReadinessCard = ({ titleAmharic, titleEnglish, icon: HeaderIcon, items, cl
                     item.status === "error" && "text-destructive",
                     item.status === "warning" && "text-warning"
                   )}>
-                    {item.labelAmharic}
+                    {item.labelEnglish}
                   </p>
-                  <p className="text-xs text-muted-foreground">{item.labelEnglish}</p>
                   {item.detail && (
                     <p className={cn("text-xs mt-1", colorClass)}>{item.detail}</p>
                   )}

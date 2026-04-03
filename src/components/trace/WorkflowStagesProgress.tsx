@@ -79,9 +79,6 @@ const WorkflowStagesProgress = ({ stages, className }: WorkflowStagesProgressPro
                 )}>
                   {stage.labelEnglish}
                 </p>
-                <p className="text-[10px] text-muted-foreground truncate">
-                  {stage.labelAmharic}
-                </p>
               </div>
               
               {/* Timestamp if complete */}
