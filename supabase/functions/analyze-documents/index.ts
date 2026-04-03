@@ -473,12 +473,16 @@ Return valid JSON with all required fields.
     // STEP 5: INJECT POLICY CLAUSE INDEX INTO RESULT
     // ═══════════════════════════════════════════════════════════════════════════════
     
-    // Inject the retrieved policy clauses into the analysis result
-    analysisResult.policyClauseIndex = policyClauses;
-    analysisResult.policyClauseIndexSummary = policyClauseIndexSummary;
+    // Inject the retrieved policy clauses into the analysis result (guard against string)
+    if (typeof analysisResult === "object" && analysisResult !== null) {
+      analysisResult.policyClauseIndex = policyClauses;
+      analysisResult.policyClauseIndexSummary = policyClauseIndexSummary;
+    } else {
+      analysisResult = { policyClauseIndex: policyClauses, policyClauseIndexSummary, rawResult: analysisResult };
+    }
     
-    // Also inject into documentComprehension if it exists
-    if (analysisResult.documentComprehension) {
+    // Also inject into documentComprehension if it exists and is an object
+    if (analysisResult.documentComprehension && typeof analysisResult.documentComprehension === "object") {
       analysisResult.documentComprehension.policyClauseIndex = policyClauses;
       analysisResult.documentComprehension.policyClauseIndexSummary = policyClauseIndexSummary;
     }
