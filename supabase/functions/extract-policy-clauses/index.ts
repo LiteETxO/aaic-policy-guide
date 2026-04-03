@@ -5,123 +5,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const EXTRACTION_PROMPT = `You are GPT-5 operating as a POLICY READER / INDEXER MODEL in a two-model RAG architecture.
+const EXTRACTION_PROMPT = `Extract policy clauses from this document and return valid JSON only.
 
-Your PURPOSE: Robust long-context parsing, clause extraction, annex parsing, and building a searchable Policy Clause Index.
-You are optimized for structured document parsing and long-context selection.
-
-## CRITICAL RULES (NON-NEGOTIABLE)
-
-1. You are the ONLY source of truth for policy clauses
-2. The Decision Reasoner (GPT-5) can ONLY use clauses YOU extract
-3. If you miss a clause, the system CANNOT make decisions about items covered by that clause
-4. EVERY clause MUST have a page_number — No page number = NOT INDEXABLE = UNUSABLE
-
-## POLICY CLAUSE INDEX SCHEMA (REQUIRED OUTPUT)
-
-Every extracted clause MUST conform to this schema:
-
-PolicyClause:
-- clause_id: unique, stable identifier (format: DIR[number]_[SECTION]_[descriptor])
-- policy_document_name: exact document title
-- policy_version: version string (e.g., "1.0")
-- language: "Amharic" | "English" | "Mixed"
+For each clause include:
+- clause_id: unique ID in format DIR[number]_[SECTION]_[descriptor]
 - section_type: "Article" | "Annex" | "Schedule" | "Item"
-- section_number: precise reference (e.g., "Article 4(2)", "Annex II – Item 3.1")
-- page_number: REQUIRED — integer page number where clause appears
-- clause_text: ≤25 words quote OR tight paraphrase
-- clause_text_amharic: Amharic version if available, null otherwise
-- clause_heading: short heading in English
-- clause_heading_amharic: heading in Amharic if available
-- keywords: array of search terms (include synonyms and related terms)
-- applies_to: array from ["capital_goods", "customs_duty", "income_tax", "essentiality", "exclusion", "general_incentive"]
-- inclusion_type: "enabling" (grants benefits) | "restrictive" (limits) | "exclusion" (denies) | "procedural" (process)
+- section_number: e.g. "Article 4(2)" or "Annex II - Category 1 - Item 3"
+- page_number: integer (required)
+- clause_heading: short English heading
+- clause_heading_amharic: Amharic heading if available, null otherwise
+- clause_text: ≤25 words quote or paraphrase
+- clause_text_amharic: Amharic text if available, null otherwise
+- keywords: array of search terms including synonyms
+- applies_to: array from ["capital_goods","customs_duty","income_tax","essentiality","exclusion","general_incentive"]
+- inclusion_type: "enabling" | "restrictive" | "exclusion" | "procedural"
 
-## EXTRACTION REQUIREMENTS
-
-### For Articles/Sections:
-- Extract each article with its number, heading, and full text
-- Identify the page number where each article appears (MANDATORY)
-- Classify each article's purpose (enabling, restrictive, exclusion, procedural)
-
-### For Annexes/Schedules (CRITICAL - Capital Goods Lists):
-- Parse EVERY individual item in annexes — this is the Capital Goods List
-- For Capital Goods Lists, extract EACH category and EACH item within categories
-- Include specific equipment names, machine types, and technical specifications
-- Generate comprehensive keywords for matching (e.g., "CNC", "lathe", "milling", "manufacturing")
-
-### Verification of Annex II (MANDATORY):
-- If the document contains Annex II / Capital Goods List:
-  - Extract EVERY item with category structure
-  - Verify capitalGoodsListPresent = true in summary
-- If Annex II is NOT found:
-  - Set capitalGoodsListPresent = false
-  - This will BLOCK all determinations until admin action
-
-## OUTPUT FORMAT
-
-Return a JSON object with this exact structure:
-{
-  "clauses": [
-    {
-      "clause_id": "DIR[number]_[SECTION]_[descriptor]",
-      "section_type": "Article|Annex|Schedule|Item",
-      "section_number": "Article 16(2)" or "Annex II - Category 1 - Item 3",
-      "page_number": 5,
-      "clause_heading": "Eligibility Criteria for Duty-Free Import",
-      "clause_heading_amharic": "ለቀረጥ ነፃ ማስገባት ብቁነት መስፈርቶች",
-      "clause_text": "Full text of the clause (≤25 words OR paraphrase)...",
-      "clause_text_amharic": "የአማርኛ ጽሑፍ..." or null,
-      "keywords": ["duty-free", "import", "capital goods", "manufacturing", "machinery"],
-      "applies_to": ["capital_goods", "customs_duty"],
-      "inclusion_type": "enabling",
-      "issuing_authority": "Ministry of Finance",
-      "notes": "Key clause for capital goods eligibility"
-    }
-  ],
-  "summary": {
-    "total_articles": 25,
-    "total_annexes": 3,
-    "total_items": 156,
-    "capital_goods_categories": ["Manufacturing Machinery", "ICT Equipment", "Agricultural"],
-    "capitalGoodsListPresent": true,
-    "directive_number": "1064/2025",
-    "effective_date": "2025-01-01"
-  }
-}
-
-## IMPORTANT RULES
-
-1. Generate unique clause_id values using format: DIR[directive_number]_[section]_[descriptor]
-2. For capital goods lists, create a SEPARATE clause for EACH specific item (not just categories)
-3. Include bilingual content where available
-4. page_number is MANDATORY — estimate from document structure if exact markers aren't present
-5. Extract at least 50-200 clauses from a typical directive document
-6. Keywords should include synonyms and related terms for better matching
-7. NO PAGE NUMBER = NOT INDEXABLE = The clause CANNOT be used for decisions
-
-## EXAMPLE CAPITAL GOODS ITEM EXTRACTION
-
-If the document contains:
-"Category 1: Manufacturing Machinery
-  1. CNC turning machines, lathes, and milling machines
-  2. Industrial robots and automated assembly systems"
-
-Extract as:
-{
-  "clause_id": "DIR1064_ANNEX2_CAT1_001",
-  "section_type": "Item",
-  "section_number": "Annex II - Category 1 - Item 1",
-  "page_number": 12,
-  "clause_heading": "CNC Turning Machines",
-  "clause_text": "CNC turning machines, lathes, and milling machines for manufacturing",
-  "keywords": ["CNC", "turning", "lathe", "milling", "machine", "manufacturing", "machining center", "metal cutting"],
-  "applies_to": ["capital_goods", "customs_duty"],
-  "inclusion_type": "enabling"
-}
-
-Parse the document THOROUGHLY. Missing items means invoice matching will FAIL.
-The Decision Reasoner can ONLY work with clauses you extract.`;
+Return JSON: { "clauses": [...], "summary": { "total_articles": 0, "total_annexes": 0, "total_items": 0, "capitalGoodsListPresent": true|false, "directive_number": "", "effective_date": "" } }`;
 
 
 
@@ -159,8 +58,8 @@ async function performExtraction(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "moonshot-v1-128k",
-        max_tokens: 64000,
+        model: "moonshot-v1-8k",
+        max_tokens: 2000,
         temperature: 0,
         response_format: { type: "json_object" },
         messages: [
@@ -176,7 +75,7 @@ Document Name: ${documentName || "Unknown"}
 Directive Number: ${directiveNumber || "Unknown"}
 
 --- DOCUMENT TEXT ---
-${documentText.substring(0, 120000)}
+${documentText.substring(0, 6000)}
 --- END DOCUMENT TEXT ---
 
 Return the JSON structure as specified. Be thorough - extract EVERY article and EVERY item from annexes/schedules.

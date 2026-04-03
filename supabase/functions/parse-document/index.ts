@@ -5,52 +5,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const TEXT_EXTRACTION_PROMPT = `You are a document text extraction assistant. Your job is to extract ALL text content from the provided document image or file.
+const TEXT_EXTRACTION_PROMPT = `Extract all text from this document exactly as it appears. Preserve structure (tables, lists, line items). For invoices include item descriptions, quantities, prices, totals, dates, and reference numbers. For licenses include holder info, licensed activities, restrictions, and validity dates. If text is unclear mark as [UNCLEAR]. Return only the extracted text.`;
 
-CRITICAL RULES:
-1. Extract ALL text exactly as it appears in the document
-2. Preserve the structure and formatting as much as possible (tables, lists, etc.)
-3. For invoices, preserve:
-   - Line items with descriptions, quantities, unit prices, and totals
-   - Invoice numbers, dates, and reference numbers
-   - Vendor and buyer information
-   - Currency and payment terms
-4. For licenses, preserve:
-   - License holder information
-   - Licensed activities and sectors
-   - Restrictions and conditions
-   - Issue dates and validity periods
-5. If text is in Amharic or mixed Amharic/English, extract both languages accurately
-6. If any text is unclear or illegible, mark it as [UNCLEAR: description]
-7. Do not summarize or interpret - just extract the raw text content
-
-OUTPUT FORMAT:
-Return ONLY the extracted text content, preserving structure with appropriate line breaks and formatting.`;
-
-const POLICY_METADATA_PROMPT = `You are a policy document metadata extractor. Analyze the provided policy document text and extract structured metadata.
-
-Extract the following fields:
-1. name: The official English name/title of the directive or policy document
-2. nameAmharic: The Amharic name/title if present (return empty string if not found)
-3. directiveNumber: The directive/proclamation number (e.g., "1064/2025", "No. 1064/2025")
-4. effectiveDate: The effective date in YYYY-MM-DD format (extract from phrases like "effective from", "came into force", etc.)
-5. documentType: One of "primary" (main directive/proclamation), "supplemental" (supporting document), or "clarification" (amendment/clarification)
-6. summary: A 1-2 sentence summary of what this policy covers
-
-IMPORTANT:
-- For dates, convert to YYYY-MM-DD format
-- For directive numbers, extract just the number portion (e.g., "1064/2025")
-- If a field cannot be determined, use empty string
-- Be precise and extract exactly what's in the document
-
-Respond with ONLY valid JSON in this exact format:
+const POLICY_METADATA_PROMPT = `Extract metadata from this policy document and return valid JSON only:
 {
-  "name": "string",
-  "nameAmharic": "string",
-  "directiveNumber": "string",
-  "effectiveDate": "string",
+  "name": "official English title",
+  "nameAmharic": "Amharic title or empty string",
+  "directiveNumber": "e.g. 1064/2025 or empty string",
+  "effectiveDate": "YYYY-MM-DD or empty string",
   "documentType": "primary|supplemental|clarification",
-  "summary": "string"
+  "summary": "1-2 sentence summary"
 }`;
 
 serve(async (req) => {
@@ -112,8 +76,9 @@ serve(async (req) => {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "moonshot-v1-128k",
+              model: "moonshot-v1-8k",
               max_tokens: maxTokens,
+              temperature: 0,
               messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userContent },
@@ -163,7 +128,7 @@ serve(async (req) => {
 
     let extractedText: string;
     try {
-      extractedText = await callMoonshotWithRetry(TEXT_EXTRACTION_PROMPT, userContent, 16000);
+      extractedText = await callMoonshotWithRetry(TEXT_EXTRACTION_PROMPT, userContent, 2000);
     } catch (error: any) {
       if (error.status === 429) {
         return new Response(JSON.stringify({ error: error.message }), {
