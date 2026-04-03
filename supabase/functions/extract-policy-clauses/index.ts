@@ -147,24 +147,27 @@ async function performExtraction(
     console.log(`[BG] Text length: ${documentText.length} characters`);
 
     // Call Anthropic API to extract clauses
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const apiKey = Deno.env.get("MOONSHOT_API_KEY");
     if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY not configured");
+      throw new Error("MOONSHOT_API_KEY not configured");
     }
 
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    const aiResponse = await fetch("https://api.moonshot.ai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: "moonshot-v1-128k",
         max_tokens: 64000,
         temperature: 0,
-        system: EXTRACTION_PROMPT,
+        response_format: { type: "json_object" },
         messages: [
+          {
+            role: "system",
+            content: EXTRACTION_PROMPT,
+          },
           {
             role: "user",
             content: `Extract all clauses from this policy document.
@@ -185,18 +188,18 @@ CRITICAL: Every clause MUST have a page_number. No page number = unusable for de
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("[BG] Anthropic API error:", errorText);
-      throw new Error(`Anthropic API error: ${aiResponse.status}`);
+      console.error("[BG] Moonshot API error:", errorText);
+      throw new Error(`Moonshot API error: ${aiResponse.status}`);
     }
 
     const aiData = await aiResponse.json();
-    const content = aiData?.content?.find((b: any) => b.type === "text")?.text;
+    const content = aiData?.choices?.[0]?.message?.content;
 
     if (!content) {
-      throw new Error("No content in Anthropic response");
+      throw new Error("No content in Moonshot response");
     }
 
-    console.log("[BG] Anthropic response received, parsing...");
+    console.log("[BG] Moonshot response received, parsing...");
 
     // Extract JSON from response (handle markdown code fences)
     let extractedData;

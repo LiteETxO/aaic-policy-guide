@@ -903,9 +903,9 @@ serve(async (req) => {
     console.log("Invoice text length:", invoiceText?.length || 0);
     console.log("Policy documents count:", policyDocuments?.length || 0);
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error("ANTHROPIC_API_KEY is not configured");
+    const MOONSHOT_API_KEY = Deno.env.get("MOONSHOT_API_KEY");
+    if (!MOONSHOT_API_KEY) {
+      throw new Error("MOONSHOT_API_KEY is not configured");
     }
 
     // Initialize Supabase client for cache and policy clause operations
@@ -1148,222 +1148,18 @@ For each item, first retrieve applicable clauses, then bind them, then reason.
 Provide your analysis in the specified JSON format with traceable clause_id references.
 `;
 
-    console.log("Calling Anthropic API (claude-3-5-sonnet)...");
+    console.log("Calling Moonshot API (moonshot-v1-128k)...");
 
-    // Anthropic messages API with tool use to force structured JSON output
+    // Moonshot OpenAI-compatible API with json_object response format
     const body: any = {
-      model: "claude-sonnet-4-5",
+      model: "moonshot-v1-128k",
       max_tokens: 32000,
       temperature: 0,
-      system: SYSTEM_PROMPT,
+      response_format: { type: "json_object" },
       messages: [
+        { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      tools: [
-        {
-          name: "return_policy_analysis",
-          description: "Return the full analysis as a single JSON object matching the required output format.",
-          input_schema: {
-              type: "object",
-              properties: {
-                documentComprehension: { 
-                  type: "object",
-                  required: ["gateStatus"],
-                  properties: {
-                    gateStatus: { type: "string", enum: ["PASSED", "BLOCKED"] },
-                    blockedReason: { type: "string" },
-                    documents: { 
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          documentName: { type: "string" },
-                          documentType: { type: "string" },
-                          issuingAuthority: { type: "string" },
-                          languagesDetected: { type: "array", items: { type: "string" } },
-                          pageCount: { type: "number" },
-                          ocrConfidence: { type: "string" },
-                          readStatus: { type: "string" }
-                        }
-                      }
-                    },
-                    policyIndex: { 
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          documentName: { type: "string" },
-                          articleSection: { type: "string" },
-                          pageNumber: { type: "number" },
-                          clauseHeading: { type: "string" },
-                          clauseText: { type: "string" }
-                        }
-                      }
-                    },
-                    licenseUnderstanding: { type: "object" },
-                    invoiceUnderstanding: { type: "object" },
-                    analysisPermissionStatement: { type: "string" }
-                  }
-                },
-                executiveSummary: { 
-                  type: "object",
-                  required: ["overallStatus", "topIssues"],
-                  properties: {
-                    overallStatus: { type: "string" },
-                    eligibleCount: { type: "number" },
-                    clarificationCount: { type: "number" },
-                    notEligibleCount: { type: "number" },
-                    topIssues: { type: "array", items: { type: "string" } },
-                    additionalInfoNeeded: { type: "array", items: { type: "string" } }
-                  }
-                },
-                licenseSnapshot: { 
-                  type: "object",
-                  required: ["licensedActivity", "extractionStatus"],
-                  properties: {
-                    licensedActivity: { type: "string" },
-                    licensedActivityAmharic: { type: "string" },
-                    licenseType: { type: "string" },
-                    licenseTypeAmharic: { type: "string" },
-                    sector: { type: "string" },
-                    scopeOfOperation: { type: "string" },
-                    restrictions: { type: "string" },
-                    licenseNumber: { type: "string" },
-                    extractionStatus: { type: "string", enum: ["Complete", "Partial", "Failed"] }
-                  }
-                },
-                guidelineMapping: {
-                  type: "object",
-                  required: ["matchStatus"],
-                  properties: {
-                    matchStatus: { type: "string", enum: ["matched", "partial", "not_found"] },
-                    licenseTypeVerbatim: { type: "string" },
-                    matchedSections: { 
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          sectionTitle: { type: "string" },
-                          sectionTitleAmharic: { type: "string" },
-                          articleHeading: { type: "string" },
-                          pageNumber: { type: "number" },
-                          clauseIds: { type: "array", items: { type: "string" } },
-                          matchConfidence: { type: "string" }
-                        }
-                      }
-                    },
-                    allowedCategories: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          categoryName: { type: "string" },
-                          categoryNameAmharic: { type: "string" },
-                          clauseId: { type: "string" },
-                          pageNumber: { type: "number" },
-                          examples: { type: "array", items: { type: "string" } }
-                        }
-                      }
-                    },
-                    exclusionsForLicense: { type: "array", items: { type: "string" } },
-                    mappingNote: { type: "string" }
-                  }
-                },
-                complianceItems: { 
-                  type: "array", 
-                  minItems: 1,
-                  items: { 
-                    type: "object",
-                    required: ["itemNumber", "invoiceItem", "normalizedName", "eligibilityStatus", "licenseAlignment", "itemClassification"],
-                    properties: {
-                      itemNumber: { type: "number" },
-                      invoiceItem: { type: "string" },
-                      normalizedName: { type: "string" },
-                      eligibilityStatus: { type: "string" },
-                      licenseAlignment: { type: "string" },
-                      // NEW: Spec 4️⃣ - Item Classification (mandatory)
-                      itemClassification: { 
-                        type: "string", 
-                        enum: ["capital_equipment", "capital_component", "tool_consumable", "ppe", "unknown"],
-                        description: "Classification: capital_equipment (integral/installed), capital_component (parts), tool_consumable (tools/consumables), ppe (safety gear), unknown"
-                      },
-                      // NEW: Spec 4️⃣ - System Association (functional grouping)
-                      systemAssociation: { 
-                        type: "string",
-                        description: "Functional system the item belongs to (e.g., Power Distribution, Cooling/HVAC, IT Infrastructure, Fire Safety)"
-                      },
-                      systemAssociationAmharic: { type: "string" },
-                      // NEW: Spec 6️⃣ - Document URL for external linking
-                      documentUrl: {
-                        type: "string",
-                        description: "URL to source policy document for external citation linking"
-                      },
-                      referencedClauseIds: { type: "array", items: { type: "string" } },
-                      citations: { 
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            clause_id: { type: "string" },
-                            documentName: { type: "string" },
-                            articleSection: { type: "string" },
-                            pageNumber: { type: "number" },
-                            quote: { type: "string" },
-                            relevance: { type: "string" },
-                            file_url: { type: "string", description: "URL to source document for external linking" }
-                          }
-                        }
-                      },
-                      essentialityAnalysis: {
-                        type: "object",
-                        properties: {
-                          functionalNecessity: { type: "string" },
-                          operationalLink: { type: "string" },
-                          capitalNature: { type: "string" },
-                          noProhibition: { type: "string" },
-                          testResult: { type: "string", enum: ["PASSED", "FAILED", "INCONCLUSIVE"] },
-                          supportingClauseIds: { type: "array", items: { type: "string" } }
-                        }
-                      },
-                      reasoning: { 
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            point: { type: "string" },
-                            type: { type: "string" }
-                          }
-                        }
-                      }
-                    }
-                  }
-                },
-                analysisCompleteness: { 
-                  type: "object",
-                  required: ["totalInvoiceItems", "analyzedItems", "isComplete"],
-                  properties: {
-                    totalInvoiceItems: { type: "number" },
-                    analyzedItems: { type: "number" },
-                    isComplete: { type: "boolean" },
-                    completenessNote: { type: "string" }
-                  }
-                },
-                officerActionsNeeded: { type: "array", items: { type: "object" } },
-              },
-              required: [
-                "documentComprehension",
-                "executiveSummary",
-                "licenseSnapshot",
-                "guidelineMapping",
-                "complianceItems",
-                "analysisCompleteness",
-                "officerActionsNeeded",
-              ],
-              additionalProperties: true,
-          },
-        },
-      ],
-      tool_choice: { type: "tool", name: "return_policy_analysis" },
     };
 
     // Create abort controller for timeout
@@ -1373,11 +1169,10 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
 
     let response: Response;
     try {
-      response = await fetch("https://api.anthropic.com/v1/messages", {
+      response = await fetch("https://api.moonshot.ai/v1/chat/completions", {
         method: "POST",
         headers: {
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
+          "Authorization": `Bearer ${MOONSHOT_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
@@ -1404,17 +1199,17 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Anthropic API error:", response.status, errorText);
+      console.error("Moonshot API error:", response.status, errorText);
       return new Response(
         JSON.stringify({
           success: false,
           error:
             response.status === 429
               ? "Rate limit exceeded. Please try again later."
-              : response.status === 402 || response.status === 529
-                ? "Anthropic API quota exceeded. Please check your API key and billing."
+              : response.status === 402
+                ? "Moonshot API quota exceeded. Please check your API key and billing."
                 : "AI service returned an error. Please retry.",
-          code: `ANTHROPIC_${response.status}`,
+          code: `MOONSHOT_${response.status}`,
           rawErrorSnippet: errorText.slice(0, 1500),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -1425,25 +1220,20 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
     try {
       aiResponse = await response.json();
     } catch (jsonError) {
-      console.error("Failed to parse Anthropic response as JSON:", jsonError);
+      console.error("Failed to parse Moonshot response as JSON:", jsonError);
       return new Response(
         JSON.stringify({
           success: false,
           error: "Invalid response from AI service. Please try again.",
-          code: "ANTHROPIC_INVALID_JSON",
+          code: "MOONSHOT_INVALID_JSON",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    console.log("Anthropic response received, stop_reason:", aiResponse?.stop_reason);
+    console.log("Moonshot response received, finish_reason:", aiResponse?.choices?.[0]?.finish_reason);
 
     const truncate = (s: string, max = 8000) =>
       s.length > max ? `${s.slice(0, max)}\n...[truncated ${s.length - max} chars]` : s;
-
-    // Anthropic returns content as an array; find the tool_use block
-    const contentBlocks: any[] = aiResponse?.content ?? [];
-    const toolUseBlock = contentBlocks.find((b: any) => b.type === "tool_use");
-    const textBlock = contentBlocks.find((b: any) => b.type === "text");
 
     const tryParseJson = (input: string) => {
       const trimmed = input.trim();
@@ -1473,26 +1263,22 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
       return tryParseJson(repairJson(cleaned));
     };
 
+    // OpenAI-compatible: content is in choices[0].message.content
+    const messageContent: string = aiResponse?.choices?.[0]?.message?.content ?? "";
+    const finishReason = aiResponse?.choices?.[0]?.finish_reason;
+
     let analysisResult: any = null;
-
-    // Prefer structured tool_use input (already parsed JSON object from Anthropic)
-    if (toolUseBlock?.input && typeof toolUseBlock.input === "object") {
-      analysisResult = toolUseBlock.input;
-    } else if (toolUseBlock?.input && typeof toolUseBlock.input === "string") {
-      analysisResult = parseFromText(toolUseBlock.input);
-    } else if (textBlock?.text) {
-      analysisResult = parseFromText(textBlock.text);
+    if (messageContent) {
+      analysisResult = parseFromText(messageContent);
     }
-
-    const finishReason = aiResponse?.stop_reason;
 
     if (!analysisResult) {
       const aiSnippet = truncate(JSON.stringify(aiResponse ?? {}), 2000);
-      console.error("Anthropic response had no parseable content", { finishReason, aiSnippet });
+      console.error("Moonshot response had no parseable content", { finishReason, aiSnippet });
       return new Response(
         JSON.stringify({
           success: false,
-          error: finishReason === "max_tokens"
+          error: finishReason === "length"
             ? "AI output was truncated. Try shorter policy docs or fewer invoice items."
             : "AI returned an empty or invalid response. Please retry.",
           code: "AI_EMPTY_RESPONSE",

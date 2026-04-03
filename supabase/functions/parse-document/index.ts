@@ -67,9 +67,9 @@ serve(async (req) => {
       throw new Error("No file data provided");
     }
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error("ANTHROPIC_API_KEY is not configured");
+    const MOONSHOT_API_KEY = Deno.env.get("MOONSHOT_API_KEY");
+    if (!MOONSHOT_API_KEY) {
+      throw new Error("MOONSHOT_API_KEY is not configured");
     }
 
     // Determine media type for Anthropic vision/document API
@@ -90,10 +90,10 @@ serve(async (req) => {
       });
     }
 
-    console.log("Calling Anthropic API for document parsing...");
+    console.log("Calling Moonshot API for document parsing...");
 
-    // Helper: call Anthropic messages API with retry logic
-    async function callAnthropicWithRetry(
+    // Helper: call Moonshot (OpenAI-compatible) messages API with retry logic
+    async function callMoonshotWithRetry(
       systemPrompt: string,
       userContent: any[],
       maxTokens: number,
@@ -103,38 +103,38 @@ serve(async (req) => {
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          console.log(`Anthropic attempt ${attempt}/${maxRetries}...`);
+          console.log(`Moonshot attempt ${attempt}/${maxRetries}...`);
 
-          const res = await fetch("https://api.anthropic.com/v1/messages", {
+          const res = await fetch("https://api.moonshot.ai/v1/chat/completions", {
             method: "POST",
             headers: {
-              "x-api-key": ANTHROPIC_API_KEY,
-              "anthropic-version": "2023-06-01",
+              "Authorization": `Bearer ${MOONSHOT_API_KEY}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "claude-sonnet-4-5",
+              model: "moonshot-v1-128k",
               max_tokens: maxTokens,
-              system: systemPrompt,
-              messages: [{ role: "user", content: userContent }],
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userContent },
+              ],
             }),
           });
 
           if (!res.ok) {
             if (res.status === 429) throw { status: 429, message: "Rate limit exceeded. Please try again later." };
-            if (res.status === 529) throw { status: 529, message: "Anthropic API overloaded. Please try again." };
             const errText = await res.text();
-            console.error(`Anthropic error (attempt ${attempt}):`, res.status, errText);
-            throw new Error(`Anthropic API error: ${res.status}`);
+            console.error(`Moonshot error (attempt ${attempt}):`, res.status, errText);
+            throw new Error(`Moonshot API error: ${res.status}`);
           }
 
           const data = await res.json();
-          const text = data?.content?.find((b: any) => b.type === "text")?.text;
-          if (!text) throw new Error("Empty response from Anthropic");
+          const text = data?.choices?.[0]?.message?.content;
+          if (!text) throw new Error("Empty response from Moonshot");
           return text;
 
         } catch (err: any) {
-          if (err.status === 429 || err.status === 529) throw err;
+          if (err.status === 429) throw err;
           lastError = err instanceof Error ? err : new Error(String(err));
           console.error(`Attempt ${attempt} failed:`, lastError.message);
           if (attempt < maxRetries) {
@@ -143,25 +143,27 @@ serve(async (req) => {
         }
       }
 
-      throw lastError || new Error("Anthropic API failed after retries");
+      throw lastError || new Error("Moonshot API failed after retries");
     }
 
-    // Build the user content block for this document
-    const documentBlock: any = contentBlockType === "document"
-      ? { type: "document", source: { type: "base64", media_type: mediaType, data: fileBase64 } }
-      : { type: "image", source: { type: "base64", media_type: mediaType, data: fileBase64 } };
-
-    const userContent: any[] = [
-      documentBlock,
-      {
-        type: "text",
-        text: `Please extract all text content from this document (${fileName}). Return only the extracted text, preserving the structure.`,
-      },
-    ];
+    // Build user content array in OpenAI format
+    // For images: use image_url with base64 data URI
+    // For PDFs: Moonshot does not support binary PDF blocks — send text prompt only
+    const userContent: any[] = [];
+    if (contentBlockType === "image") {
+      userContent.push({
+        type: "image_url",
+        image_url: { url: `data:${mediaType};base64,${fileBase64}` },
+      });
+    }
+    userContent.push({
+      type: "text",
+      text: `Please extract all text content from this document (${fileName}). Return only the extracted text, preserving the structure.`,
+    });
 
     let extractedText: string;
     try {
-      extractedText = await callAnthropicWithRetry(TEXT_EXTRACTION_PROMPT, userContent, 16000);
+      extractedText = await callMoonshotWithRetry(TEXT_EXTRACTION_PROMPT, userContent, 16000);
     } catch (error: any) {
       if (error.status === 429) {
         return new Response(JSON.stringify({ error: error.message }), {
@@ -179,7 +181,7 @@ serve(async (req) => {
     if (extractMetadata) {
       console.log("Extracting policy metadata...");
       try {
-        const metadataText = await callAnthropicWithRetry(
+        const metadataText = await callMoonshotWithRetry(
           POLICY_METADATA_PROMPT,
           [{ type: "text", text: `Extract metadata from this policy document:\n\n${extractedText.substring(0, 8000)}` }],
           1000,
