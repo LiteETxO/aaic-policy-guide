@@ -732,7 +732,7 @@ const PolicyLibrary = () => {
                   <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
                     {isAdmin 
                       ? "Drop a PDF here or click below to import your first policy document. Content will be automatically extracted."
-                      : "Contact an administrator to add policy documents."}
+                      : "No policy documents uploaded yet. Contact your administrator."}
                   </p>
                   {isAdmin && (
                     <>

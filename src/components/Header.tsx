@@ -1,8 +1,19 @@
-import { Shield, FileText, BarChart3, Bell } from "lucide-react";
+import { Shield, FileText, BarChart3, Bell, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
 
 const Header = () => {
+  const { user, userRole, signOut } = useAuth();
+
+  const email = user?.email ?? "";
+  const avatarLetter = email ? email[0].toUpperCase() : "?";
+  const displayRole = user?.app_metadata?.role
+    ? (user.app_metadata.role as string).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : userRole
+    ? userRole.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : "Officer";
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 shadow-soft">
       <div className="container flex h-14 items-center justify-between gap-4">
@@ -34,15 +45,36 @@ const Header = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
             <Bell className="h-4 w-4" />
           </Button>
-          <div className="hidden sm:flex flex-col items-end">
-            <span className="text-xs font-semibold text-foreground">Officer Portal</span>
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal">
-              Investment Commission
-            </Badge>
-          </div>
-          <div className="h-8 w-8 rounded-full gradient-gold flex items-center justify-center ring-2 ring-offset-1 ring-amber-200 shadow-sm">
-            <span className="text-xs font-bold text-white">AA</span>
-          </div>
+          {user && (
+            <>
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-xs font-semibold text-foreground">{email}</span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal">
+                  {displayRole}
+                </Badge>
+              </div>
+              <div className="h-8 w-8 rounded-full gradient-gold flex items-center justify-center ring-2 ring-offset-1 ring-amber-200 shadow-sm">
+                <span className="text-xs font-bold text-white">{avatarLetter}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={signOut}
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          {!user && (
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-xs font-semibold text-foreground">Officer Portal</span>
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal">
+                Investment Commission
+              </Badge>
+            </div>
+          )}
         </div>
       </div>
     </header>

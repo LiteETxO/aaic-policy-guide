@@ -128,6 +128,7 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
         toast.info(`Extracting text from ${file.name}...`);
 
         const extractedText = await extractTextFromFile(file);
+        console.log(`[pdfExtract] ${file.name}: extracted ${extractedText?.length ?? 0} characters`);
 
         if (extractedText && extractedText.length > 100) {
           updateDocumentStatus(file.name, { status: "complete", progress: 100 });

@@ -34,10 +34,12 @@ export const usePolicyDocuments = () => {
 
       if (error) {
         console.error("Error fetching policy documents:", error);
-        throw error;
+        // Return empty array instead of throwing so the UI shows the friendly empty state
+        // (RLS may block reads for unauthenticated or lower-privilege users)
+        return [] as PolicyDocument[];
       }
 
-      return data as PolicyDocument[];
+      return (data ?? []) as PolicyDocument[];
     },
   });
 };
