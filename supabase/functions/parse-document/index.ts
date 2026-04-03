@@ -153,10 +153,17 @@ serve(async (req) => {
           2,
         );
 
-        let jsonStr = metadataText;
-        const jsonMatch = metadataText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch) jsonStr = jsonMatch[1].trim();
-        metadata = JSON.parse(jsonStr);
+        let jsonStr = metadataText.trim();
+        const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (fenceMatch) {
+          jsonStr = fenceMatch[1].trim();
+        } else {
+          const first = jsonStr.indexOf("{");
+          const last = jsonStr.lastIndexOf("}");
+          if (first !== -1 && last > first) jsonStr = jsonStr.slice(first, last + 1);
+        }
+        const parsed = JSON.parse(jsonStr);
+        metadata = (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : null;
         console.log("Metadata extracted:", metadata);
       } catch (parseErr) {
         console.error("Failed to extract metadata:", parseErr);

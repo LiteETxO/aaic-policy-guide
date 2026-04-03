@@ -341,7 +341,10 @@ Return valid JSON with all required fields.
 
     const tryParseJson = (input: string) => {
       const trimmed = input.trim();
-      try { return JSON.parse(trimmed); } catch { return null; }
+      try {
+        const parsed = JSON.parse(trimmed);
+        return (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : null;
+      } catch { return null; }
     };
 
     const stripCodeFences = (text: string) => {
@@ -374,6 +377,20 @@ Return valid JSON with all required fields.
     let analysisResult: any = null;
     if (messageContent) {
       analysisResult = parseFromText(messageContent);
+      // If the response was plain text (not JSON), build a minimal valid object
+      if (!analysisResult || typeof analysisResult !== "object") {
+        const plainText = typeof analysisResult === "string" ? analysisResult : messageContent;
+        console.warn("Moonshot returned plain text instead of JSON — building minimal analysis object");
+        analysisResult = {
+          parseError: true,
+          parseErrorReason: "PLAIN_TEXT_RESPONSE",
+          rawTextResponse: plainText.slice(0, 2000),
+          documentComprehension: { gateStatus: "FAILED", notes: "AI returned plain text instead of JSON" },
+          executiveSummary: { overallStatus: "Error", summary: plainText.slice(0, 500) },
+          complianceItems: [],
+          analysisCompleteness: { isComplete: false },
+        };
+      }
     }
 
     if (!analysisResult) {
