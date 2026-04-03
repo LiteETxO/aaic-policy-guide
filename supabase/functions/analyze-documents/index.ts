@@ -1152,7 +1152,7 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
 
     // Anthropic messages API with tool use to force structured JSON output
     const body: any = {
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-5",
       max_tokens: 32000,
       temperature: 0,
       system: SYSTEM_PROMPT,
