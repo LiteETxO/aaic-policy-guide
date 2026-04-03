@@ -462,58 +462,70 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
       setAnalysisStepLabel("Running AI analysis...");
       addTechnicalLog("Checkpoint saved before AI gateway call");
 
-      const MOONSHOT_API_KEY = import.meta.env.VITE_MOONSHOT_API_KEY;
-
       const licenseText = licenseZone?.fileText || `License file: ${licenseZone?.file?.name}`;
       const invoiceText = invoiceZone?.fileText || `Invoice file: ${invoiceZone?.file?.name}`;
-      const truncatedInvoice = invoiceText.slice(0, 18000);
-
-      const USER_PROMPT = `Analyze these documents for Ethiopian customs duty exemption eligibility under Capital Goods List Annex 1064/2025.
-
-INVESTMENT LICENSE:
-${licenseText}
-
-COMMERCIAL INVOICE:
-${truncatedInvoice}
-
-Analyze every line item in the invoice. For each item determine: ELIGIBLE (qualifies for duty exemption), EXCLUDED (does not qualify), or REVIEW (needs manual review). Include the relevant HS Code if identifiable and cite the specific policy basis from Annex 1064/2025.`;
 
       let data: any;
       let error: any;
 
       try {
-        setAnalysisStepLabel("Calling Moonshot AI...");
-        const moonshotResponse = await fetch("https://api.moonshot.ai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${MOONSHOT_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "moonshot-v1-32k",
-            max_tokens: 6000,
-            temperature: 0,
-            response_format: { type: "json_object" },
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: USER_PROMPT }
-            ]
-          })
-        });
-
-        if (!moonshotResponse.ok) {
-          throw new Error(`Moonshot API error: ${moonshotResponse.status} ${moonshotResponse.statusText}`);
+        // Split invoice into 5k batches and call edge function multiple times
+        const BATCH = 5500;
+        const batches: string[] = [];
+        for (let i = 0; i < invoiceText.length; i += BATCH) {
+          batches.push(invoiceText.slice(i, i + BATCH));
         }
 
-        const moonshotData = await moonshotResponse.json();
-        const analysisText = moonshotData.choices?.[0]?.message?.content;
-        if (!analysisText) {
-          throw new Error("No response content from Moonshot API");
+        setAnalysisStepLabel(`Running AI analysis (0/${batches.length} batches)...`);
+        const allItems: any[] = [];
+        let permitSummary: any = {};
+        let lastError: any = null;
+
+        for (let i = 0; i < batches.length; i++) {
+          setAnalysisStepLabel(`Running AI analysis (${i + 1}/${batches.length} batches)...`);
+          setAnalysisProgress(60 + Math.round((i / batches.length) * 25));
+
+          const resp = await supabase.functions.invoke("analyze-documents", {
+            body: {
+              licenseText: licenseText.slice(0, 800),
+              invoiceText: batches[i],
+            },
+          });
+
+          if (resp.error) { lastError = resp.error; break; }
+          if (resp.data?.success) {
+            const items = resp.data.analysis?.complianceItems || [];
+            allItems.push(...items);
+            if (i === 0) permitSummary = resp.data.analysis?.permitSummary || {};
+          } else {
+            lastError = new Error(resp.data?.error || "Batch failed");
+            break;
+          }
         }
 
-        const analysis = JSON.parse(analysisText);
-        data = { success: true, analysis };
-        error = null;
+        if (lastError) {
+          error = lastError;
+          data = null;
+        } else {
+          const eligible = allItems.filter((x: any) => x.decision === "ELIGIBLE").length;
+          const excluded = allItems.filter((x: any) => x.decision === "EXCLUDED").length;
+          const review = allItems.filter((x: any) => x.decision === "REVIEW").length;
+          data = {
+            success: true,
+            analysis: {
+              permitSummary,
+              executiveSummary: {
+                totalItemsAnalyzed: allItems.length,
+                eligibleCount: eligible,
+                excludedCount: excluded,
+                requiresReviewCount: review,
+                overallRecommendation: `Of ${allItems.length} items analyzed, ${eligible} qualify for customs duty exemption under Directive 1064/2025. ${excluded} items (tools/consumables) are excluded. ${review} items require officer review.`
+              },
+              complianceItems: allItems
+            }
+          };
+          error = null;
+        }
       } catch (fetchError: any) {
         error = fetchError;
         data = null;
