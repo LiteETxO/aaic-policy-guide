@@ -739,77 +739,76 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
   }
 
   return (
-    <section className="py-16 bg-muted/30">
-      <div className="container">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">Upload Case Documents</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Upload the investment license and commercial invoices for AI-powered compliance analysis 
-            against the Policy Library.
+    <section className="py-6">
+      <div className="max-w-3xl">
+        <div className="mb-5">
+          <h3 className="text-base font-semibold text-foreground">Upload Case Documents</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Upload the investment license and commercial invoice for AI-powered compliance analysis.
           </p>
-          <p className="text-sm text-muted-foreground mt-2">የጉዳይ ሰነዶችን ይጫኑ</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-10">
+        <div className="grid md:grid-cols-2 gap-4 mb-6">
           {uploadZones.map((zone, index) => (
             <Card
               key={zone.id}
               className={cn(
-                "relative transition-all duration-300 animate-fade-in",
-                dragOver === zone.id && "ring-2 ring-primary shadow-elevated",
-                zone.file && "border-success"
+                "relative border rounded-xl transition-all duration-200 animate-fade-in shadow-soft",
+                dragOver === zone.id && "ring-2 ring-primary/40 shadow-medium border-primary/40",
+                zone.file ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-white"
               )}
-              style={{ animationDelay: `${index * 100}ms` }}
+              style={{ animationDelay: `${index * 80}ms` }}
             >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <zone.icon className="h-5 w-5 text-primary" />
+              <CardHeader className="pb-2 pt-4 px-4">
+                <div className="flex items-start justify-between mb-1">
+                  <div className={cn(
+                    "h-9 w-9 rounded-xl flex items-center justify-center",
+                    zone.file ? "bg-emerald-100" : "bg-primary/10"
+                  )}>
+                    <zone.icon className={cn("h-4.5 w-4.5", zone.file ? "text-emerald-600" : "text-primary")} />
                   </div>
-                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-destructive/10 text-destructive">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-100">
                     Required
                   </span>
                 </div>
-                <CardTitle className="text-lg">{zone.title}</CardTitle>
-                <p className="text-xs text-muted-foreground">{zone.titleAmharic}</p>
-                <CardDescription className="text-sm">{zone.description}</CardDescription>
+                <CardTitle className="text-sm font-semibold">{zone.title}</CardTitle>
+                <CardDescription className="text-xs">{zone.description}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 pb-4">
                 {zone.file ? (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-success/10 border border-success/20">
-                    <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+                  <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200/60">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{zone.file.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium truncate text-slate-700">{zone.file.name}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
                         {(zone.file.size / 1024).toFixed(1)} KB
                       </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 shrink-0"
+                      className="h-7 w-7 shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
                       onClick={() => removeFile(zone.id)}
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ) : (
                   <label
                     className={cn(
-                      "flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors",
-                      "hover:border-primary hover:bg-primary/5",
-                      dragOver === zone.id && "border-primary bg-primary/5"
+                      "flex flex-col items-center justify-center p-5 border-2 border-dashed rounded-xl cursor-pointer transition-all",
+                      "hover:border-primary/50 hover:bg-primary/3",
+                      dragOver === zone.id && "border-primary/60 bg-primary/5"
                     )}
-                    onDragOver={e => {
-                      e.preventDefault();
-                      setDragOver(zone.id);
-                    }}
+                    onDragOver={e => { e.preventDefault(); setDragOver(zone.id); }}
                     onDragLeave={() => setDragOver(null)}
                     onDrop={e => handleDrop(e, zone.id)}
                   >
-                    <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                    <span className="text-sm font-medium">Drop file here</span>
-                    <span className="text-xs text-muted-foreground mt-1">or click to browse</span>
+                    <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center mb-2.5">
+                      <Upload className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-600">Drop file here</span>
+                    <span className="text-[10px] text-slate-400 mt-1">or click to browse</span>
                     <input
                       type="file"
                       className="hidden"
@@ -823,36 +822,34 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
           ))}
         </div>
 
-        <div className="text-center">
+        <div className="space-y-2.5">
           <Button
-            variant="hero"
-            size="xl"
             disabled={!hasRequiredFiles || isAnalyzing || !user}
             onClick={handleAnalyze}
-            className="min-w-[200px]"
+            className="w-full h-11 text-sm font-semibold bg-primary hover:bg-primary/90 text-white shadow-sm rounded-xl transition-all hover:shadow-md"
           >
             {isAnalyzing ? (
               <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Analyzing...
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Analyzing Documents...
               </>
             ) : (
               "Analyze Documents"
             )}
           </Button>
           {!hasRequiredFiles && (
-            <p className="text-sm text-muted-foreground mt-3">
-              Please upload both the investment license and invoice(s) to proceed
+            <p className="text-xs text-center text-muted-foreground">
+              Upload both the investment license and invoice to proceed
             </p>
           )}
           {!user && (
-            <p className="text-sm text-warning mt-3">
-              Please sign in to analyze documents
+            <p className="text-xs text-center text-amber-600 font-medium">
+              Sign in required to analyze documents
             </p>
           )}
           {policyDocuments?.length === 0 && (
-            <p className="text-sm text-warning mt-3">
-              No policy documents in library — analysis requires at least one policy document
+            <p className="text-xs text-center text-amber-600 font-medium">
+              Policy library is empty — an admin must add policy documents first
             </p>
           )}
         </div>

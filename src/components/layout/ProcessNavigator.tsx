@@ -1,6 +1,6 @@
-import { 
-  BookOpen, FileText, ClipboardList, FileSearch, BarChart3, FileOutput,
-  Check, Lock, AlertOctagon, ChevronRight
+import {
+  FileText, ClipboardList, FileSearch, BarChart3, FileOutput,
+  Check, Lock, AlertOctagon, ChevronRight, BookOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -22,37 +22,37 @@ export const PROCESS_STEPS: ProcessStep[] = [
   {
     id: 1,
     labelAmharic: "የሰነድ ዝግጅት",
-    labelEnglish: "Document Preparation",
+    labelEnglish: "Documents",
     icon: FileText,
-    description: "የፖሊሲ ቤተ-መጽሐፍት፣ ፈቃድ እና ደረሰኝ (Policy library, license and invoice)",
+    description: "Load policy library, upload investment license and commercial invoice",
   },
   {
     id: 2,
     labelAmharic: "የንጥል ትንተና",
-    labelEnglish: "Item Analysis",
+    labelEnglish: "Analysis",
     icon: ClipboardList,
-    description: "እያንዳንዱ ዕቃ ይተነተናል (Each item is being analyzed)",
+    description: "AI-powered analysis of each line item against policy directives",
   },
   {
     id: 3,
     labelAmharic: "ማስረጃ ግምገማ",
-    labelEnglish: "Evidence Review",
+    labelEnglish: "Evidence",
     icon: FileSearch,
-    description: "ማስረጃዎችን እና ጥቅሶችን ያረጋግጡ (Review evidence and citations)",
+    description: "Review policy citations and evidence binding for each item",
   },
   {
     id: 4,
     labelAmharic: "ማጠቃለያ (ምክር)",
-    labelEnglish: "Executive Summary",
+    labelEnglish: "Summary",
     icon: BarChart3,
-    description: "ቅድመ-ማጠቃለያ - ከማስረጃ በኋላ ይመልከቱ (Advisory - review after evidence)",
+    description: "Preliminary advisory summary — review after evidence is confirmed",
   },
   {
     id: 5,
     labelAmharic: "መደበኛ ሪፖርት",
-    labelEnglish: "Formal Report",
+    labelEnglish: "Report",
     icon: FileOutput,
-    description: "ይውረድ ወይም ያትሙ (Download or print)",
+    description: "Generate official decision report for download, email, or print",
   },
 ];
 
@@ -63,15 +63,6 @@ interface ProcessNavigatorProps {
   onStepClick?: (step: number) => void;
 }
 
-/**
- * Vertical Process Navigator - Enforces thinking order
- * Rules:
- * - Only ONE step may be expanded at a time
- * - Steps unlock sequentially
- * - Completed steps show ✅
- * - Blocked steps show 🚫 with tooltip
- * - Future steps are 🔒 locked
- */
 const ProcessNavigator = ({
   currentStep,
   completedSteps,
@@ -82,7 +73,6 @@ const ProcessNavigator = ({
     if (completedSteps.includes(stepId)) return "completed";
     if (blockedSteps.some((b) => b.step === stepId)) return "blocked";
     if (stepId === currentStep) return "current";
-    // A step is unlocked if all previous steps are completed
     const previousStepsCompleted = PROCESS_STEPS
       .filter((s) => s.id < stepId)
       .every((s) => completedSteps.includes(s.id));
@@ -107,11 +97,11 @@ const ProcessNavigator = ({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <nav className="w-full py-6 px-4 space-y-1">
-        <div className="mb-6 px-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            የውሳኔ ሂደት (Decision Process)
-          </h3>
+      <nav className="w-full py-5 px-3 space-y-0.5">
+        <div className="mb-5 px-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+            Decision Process
+          </p>
         </div>
 
         {PROCESS_STEPS.map((step, index) => {
@@ -125,72 +115,73 @@ const ProcessNavigator = ({
               onClick={() => handleStepClick(step.id)}
               disabled={!isClickable}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-all duration-200",
-                "group relative",
-                status === "current" && "bg-primary/10 border border-primary/20",
-                status === "completed" && "hover:bg-muted/50",
-                status === "blocked" && "bg-destructive/5 border border-destructive/20",
-                status === "locked" && "opacity-50 cursor-not-allowed",
-                isClickable && status !== "current" && "hover:bg-muted/50 cursor-pointer"
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150",
+                "relative group",
+                status === "current" && "bg-primary/10 border border-primary/25 shadow-sm",
+                status === "completed" && "hover:bg-slate-50 cursor-pointer",
+                status === "blocked" && "bg-red-50 border border-red-200/60",
+                status === "locked" && "opacity-40 cursor-not-allowed",
+                isClickable && status !== "current" && "hover:bg-slate-50"
               )}
             >
-              {/* Step number/icon indicator */}
+              {/* Step indicator */}
               <div
                 className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-lg shrink-0 text-sm font-semibold transition-colors",
-                  status === "completed" && "bg-success text-success-foreground",
-                  status === "current" && "bg-primary text-primary-foreground",
-                  status === "blocked" && "bg-destructive text-destructive-foreground",
-                  status === "locked" && "bg-muted text-muted-foreground"
+                  "flex items-center justify-center w-7 h-7 rounded-lg shrink-0 text-xs font-bold transition-colors",
+                  status === "completed" && "bg-emerald-500 text-white",
+                  status === "current" && "bg-primary text-white shadow-sm",
+                  status === "blocked" && "bg-red-500 text-white",
+                  status === "locked" && "bg-slate-200 text-slate-400"
                 )}
               >
                 {status === "completed" ? (
-                  <Check className="h-4 w-4" />
+                  <Check className="h-3.5 w-3.5 stroke-[2.5]" />
                 ) : status === "blocked" ? (
-                  <AlertOctagon className="h-4 w-4" />
+                  <AlertOctagon className="h-3.5 w-3.5" />
                 ) : status === "locked" ? (
-                  <Lock className="h-3.5 w-3.5" />
+                  <Lock className="h-3 w-3" />
                 ) : (
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-3.5 w-3.5" />
                 )}
               </div>
 
-              {/* Step labels */}
+              {/* Label */}
               <div className="flex-1 min-w-0">
                 <p
                   className={cn(
-                    "text-sm font-medium truncate",
+                    "text-sm font-medium truncate leading-none",
                     status === "current" && "text-primary",
                     status === "completed" && "text-foreground",
-                    status === "blocked" && "text-destructive",
+                    status === "blocked" && "text-red-600",
                     status === "locked" && "text-muted-foreground"
                   )}
                 >
-                  {step.labelAmharic}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
                   {step.labelEnglish}
+                </p>
+                <p className={cn(
+                  "text-[11px] mt-0.5 truncate",
+                  status === "current" ? "text-primary/60" : "text-muted-foreground/60"
+                )}>
+                  Step {step.id}
                 </p>
               </div>
 
-              {/* Current step indicator */}
               {status === "current" && (
-                <ChevronRight className="h-4 w-4 text-primary shrink-0" />
+                <ChevronRight className="h-3.5 w-3.5 text-primary shrink-0" />
               )}
 
-              {/* Connecting line to next step */}
+              {/* Connector line */}
               {index < PROCESS_STEPS.length - 1 && (
                 <div
                   className={cn(
-                    "absolute left-[26px] top-[48px] w-0.5 h-4 -mb-4",
-                    completedSteps.includes(step.id) ? "bg-success/50" : "bg-border"
+                    "absolute left-[22px] top-[44px] w-px h-3",
+                    completedSteps.includes(step.id) ? "bg-emerald-300" : "bg-slate-200"
                   )}
                 />
               )}
             </button>
           );
 
-          // Wrap with tooltip for blocked or locked steps
           if (status === "blocked" || status === "locked") {
             return (
               <Tooltip key={step.id}>
@@ -199,12 +190,13 @@ const ProcessNavigator = ({
                   <p className="text-sm">
                     {status === "blocked" ? (
                       <>
-                        <span className="font-semibold text-destructive">ታግዷል:</span>{" "}
-                        {blockedReason || "ችግር ተገኝቷል"}
+                        <span className="font-semibold text-destructive">Blocked: </span>
+                        {blockedReason || "An issue was detected"}
                       </>
                     ) : (
                       <>
-                        <span className="font-semibold">ተቆልፏል:</span> {step.description}
+                        <span className="font-semibold">Locked: </span>
+                        {step.description}
                       </>
                     )}
                   </p>

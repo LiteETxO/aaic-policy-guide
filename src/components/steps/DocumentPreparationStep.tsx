@@ -1,5 +1,5 @@
-import { 
-  FileText, BookOpen, Upload, CheckCircle2, XCircle, AlertTriangle, Lock, Gauge, Eye, Plus 
+import {
+  FileText, BookOpen, Upload, CheckCircle2, XCircle, AlertTriangle, Lock, Gauge, Eye, Plus
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,6 @@ interface DocumentPreparationStepProps {
   invoiceUploaded: boolean;
   isPolicyLoading?: boolean;
   children?: React.ReactNode;
-  // Analysis session management
   hasActiveAnalysis?: boolean;
   onClearAnalysis?: () => void;
   onViewResults?: () => void;
@@ -48,19 +47,6 @@ interface DocumentPreparationStepProps {
   isDeleting?: boolean;
 }
 
-/**
- * Step 1 — Document Preparation (Combined)
- * Shows:
- * - Policy Library readiness
- * - Case document uploads (license + invoice)
- * - Combined readiness meter
- * - Analysis history panel
- * 
- * Does NOT show:
- * - Executive Summary
- * - Eligibility labels
- * - Verdict colors
- */
 const DocumentPreparationStep = ({
   policyDocuments,
   uploadedDocuments,
@@ -80,44 +66,43 @@ const DocumentPreparationStep = ({
 }: DocumentPreparationStepProps) => {
   const totalPolicyDocs = policyDocuments.length;
   const hasCapitalGoodsList = policyDocuments.some((d) => d.capitalGoodsListPresent);
-  
-  // Combined readiness checklist
+
   const readinessItems = [
-    { 
+    {
       section: "policy",
-      label: "Policy Documents Loaded", 
-      labelAmharic: "የፖሊሲ ሰነዶች ተጫኑ", 
-      done: totalPolicyDocs > 0 
+      label: "Policy Documents Loaded",
+      labelAmharic: "የፖሊሲ ሰነዶች ተጫኑ",
+      done: totalPolicyDocs > 0
     },
-    { 
+    {
       section: "policy",
-      label: "Articles Indexed", 
-      labelAmharic: "አንቀጾች ተዘረዘሩ", 
-      done: policyDocuments.some((d) => (d.articlesIndexed ?? 0) > 0) 
+      label: "Articles Indexed",
+      labelAmharic: "አንቀጾች ተዘረዘሩ",
+      done: policyDocuments.some((d) => (d.articlesIndexed ?? 0) > 0)
     },
-    { 
+    {
       section: "policy",
-      label: "Capital Goods List Found", 
-      labelAmharic: "የካፒታል ዕቃዎች ዝርዝር ተገኘ", 
-      done: hasCapitalGoodsList 
+      label: "Capital Goods List Found",
+      labelAmharic: "የካፒታል ዕቃዎች ዝርዝር ተገኘ",
+      done: hasCapitalGoodsList
     },
-    { 
+    {
       section: "case",
-      label: "License Uploaded", 
-      labelAmharic: "ፈቃድ ተጫነ", 
-      done: licenseUploaded 
+      label: "License Uploaded",
+      labelAmharic: "ፈቃድ ተጫነ",
+      done: licenseUploaded
     },
-    { 
+    {
       section: "case",
-      label: "Invoice Uploaded", 
-      labelAmharic: "ደረሰኝ ተጫነ", 
-      done: invoiceUploaded 
+      label: "Invoice Uploaded",
+      labelAmharic: "ደረሰኝ ተጫነ",
+      done: invoiceUploaded
     },
   ];
-  
+
   const policyItems = readinessItems.filter(r => r.section === "policy");
   const caseItems = readinessItems.filter(r => r.section === "case");
-  
+
   const policyReadiness = (policyItems.filter(r => r.done).length / policyItems.length) * 100;
   const caseReadiness = (caseItems.filter(r => r.done).length / caseItems.length) * 100;
   const overallReadiness = (readinessItems.filter(r => r.done).length / readinessItems.length) * 100;
@@ -126,74 +111,72 @@ const DocumentPreparationStep = ({
     <div
       key={index}
       className={cn(
-        "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+        "flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors",
         item.done
-          ? "bg-success/5 border-success/20"
-          : "bg-muted/30 border-border"
+          ? "bg-emerald-50 border-emerald-200/60"
+          : "bg-slate-50 border-slate-200/60"
       )}
     >
       {item.done ? (
-        <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+        <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
       ) : (
-        <XCircle className="h-5 w-5 text-muted-foreground shrink-0" />
+        <XCircle className="h-4 w-4 text-slate-300 shrink-0" />
       )}
-      <div className="flex-1">
-        <p className={cn("text-sm font-medium", item.done ? "text-success" : "text-muted-foreground")}>
-          {item.labelAmharic}
-        </p>
-        <p className="text-xs text-muted-foreground">{item.label}</p>
-      </div>
+      <p className={cn(
+        "flex-1 text-sm font-medium",
+        item.done ? "text-slate-700" : "text-slate-400"
+      )}>
+        {item.label}
+      </p>
       {item.done ? (
-        <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs">
-          ✓ ተጠናቋል
+        <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs font-medium px-2 h-5">
+          Complete
         </Badge>
       ) : (
-        <Badge variant="outline" className="text-muted-foreground text-xs">
-          ይጠበቃል
+        <Badge variant="outline" className="text-slate-400 text-xs font-medium px-2 h-5">
+          Pending
         </Badge>
       )}
     </div>
   );
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      {/* Section Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <FileText className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold">የሰነድ ዝግጅት (Document Preparation)</h2>
-            <p className="text-sm text-muted-foreground">
-              ሁሉንም ሰነዶች ከመተንተንዎ በፊት ያዘጋጁ
-            </p>
-          </div>
+    <div className="p-6 lg:p-8 space-y-6 max-w-4xl">
+      {/* Page header */}
+      <div className="flex items-center gap-3">
+        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <FileText className="h-4.5 w-4.5 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-foreground">Document Preparation</h2>
+          <p className="text-sm text-muted-foreground">
+            Load all required documents before starting compliance analysis
+          </p>
         </div>
       </div>
 
-      {/* Active Analysis Banner */}
+      {/* Active analysis banner */}
       {hasActiveAnalysis && (
-        <Card className="border-l-4 border-l-success bg-success/5">
-          <CardContent className="py-4">
+        <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/50 border-emerald-200/60 shadow-none">
+          <CardContent className="py-3.5 px-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-success" />
+                <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500 shrink-0" />
                 <div>
-                  <p className="font-medium text-success">ንቁ ትንታኔ አለ (Active Analysis Exists)</p>
-                  <p className="text-sm text-muted-foreground">
-                    ውጤቱን ለማየት ወይም አዲስ ጉዳይ ለመጀመር ይምረጡ
+                  <p className="text-sm font-semibold text-slate-800">Active Analysis Available</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Choose to view existing results or start a fresh analysis
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="default" size="sm" onClick={onViewResults}>
-                  <Eye className="h-4 w-4 mr-1" />
-                  ውጤቱን ይመልከቱ (View Results)
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="default" size="sm" onClick={onViewResults} className="h-8 text-xs">
+                  <Eye className="h-3.5 w-3.5 mr-1.5" />
+                  View Results
                 </Button>
-                <Button variant="outline" size="sm" onClick={onClearAnalysis}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  አዲስ ጀምር (Start New)
+                <Button variant="outline" size="sm" onClick={onClearAnalysis} className="h-8 text-xs">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Start New
                 </Button>
               </div>
             </div>
@@ -201,90 +184,106 @@ const DocumentPreparationStep = ({
         </Card>
       )}
 
-      {/* Overall Readiness Card */}
-      <Card className="border-l-4 border-l-primary">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Gauge className="h-5 w-5 text-primary" />
-              አጠቃላይ ዝግጁነት (Overall Readiness)
-            </CardTitle>
-            <Badge
-              variant="outline"
-              className={cn(
-                overallReadiness === 100
-                  ? "bg-success/10 text-success border-success/30"
-                  : overallReadiness >= 60
-                    ? "bg-warning/10 text-warning border-warning/30"
-                    : "bg-muted text-muted-foreground"
-              )}
-            >
-              {Math.round(overallReadiness)}% ዝግጁ
-            </Badge>
-          </div>
-          <CardDescription>
-            Complete all items to proceed with analysis
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Overall Progress bar */}
-          <Progress value={overallReadiness} className="h-2" />
-
-          {/* Policy Section */}
-          <div className="space-y-3">
+      {/* Readiness overview — 2-column */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Policy Library card */}
+        <Card className="border border-slate-200 shadow-soft rounded-xl">
+          <CardHeader className="pb-3 pt-4 px-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">የፖሊሲ ቤተ-መጽሐፍት (Policy Library)</span>
+                <CardTitle className="text-sm font-semibold">Policy Library</CardTitle>
               </div>
-              <Badge variant="secondary" className="text-xs">
-                {Math.round(policyReadiness)}%
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs h-5 px-2 font-medium",
+                  policyReadiness === 100
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : policyReadiness > 0
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-slate-50 text-slate-500 border-slate-200"
+                )}
+              >
+                {policyReadiness === 100 ? "Ready" : policyReadiness > 0 ? "Partial" : "Missing"}
               </Badge>
             </div>
-            <div className="grid gap-2 pl-6">
-              {policyItems.map(renderReadinessItem)}
-            </div>
-          </div>
+            <Progress value={policyReadiness} className="h-1 mt-2" />
+          </CardHeader>
+          <CardContent className="px-4 pb-4 space-y-1.5">
+            {policyItems.map(renderReadinessItem)}
+          </CardContent>
+        </Card>
 
-          <Separator />
-
-          {/* Case Documents Section */}
-          <div className="space-y-3">
+        {/* Case Documents card */}
+        <Card className="border border-slate-200 shadow-soft rounded-xl">
+          <CardHeader className="pb-3 pt-4 px-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Upload className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">የጉዳይ ሰነዶች (Case Documents)</span>
+                <CardTitle className="text-sm font-semibold">Case Documents</CardTitle>
               </div>
-              <Badge variant="secondary" className="text-xs">
-                {Math.round(caseReadiness)}%
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs h-5 px-2 font-medium",
+                  caseReadiness === 100
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : caseReadiness > 0
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-slate-50 text-slate-500 border-slate-200"
+                )}
+              >
+                {caseReadiness === 100 ? "Ready" : caseReadiness > 0 ? "Partial" : "Missing"}
               </Badge>
             </div>
-            <div className="grid gap-2 pl-6">
-              {caseItems.map(renderReadinessItem)}
-            </div>
+            <Progress value={caseReadiness} className="h-1 mt-2" />
+          </CardHeader>
+          <CardContent className="px-4 pb-4 space-y-1.5">
+            {caseItems.map(renderReadinessItem)}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Overall readiness strip */}
+      <div className={cn(
+        "flex items-center gap-4 px-4 py-3 rounded-xl border",
+        overallReadiness === 100
+          ? "bg-emerald-50 border-emerald-200/60"
+          : overallReadiness >= 60
+            ? "bg-amber-50 border-amber-200/60"
+            : "bg-slate-50 border-slate-200"
+      )}>
+        <Gauge className={cn(
+          "h-4 w-4 shrink-0",
+          overallReadiness === 100 ? "text-emerald-500" : overallReadiness >= 60 ? "text-amber-500" : "text-slate-400"
+        )} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-slate-700">Overall Readiness</span>
+            <span className="text-xs font-bold text-slate-700">{Math.round(overallReadiness)}%</span>
           </div>
+          <Progress value={overallReadiness} className="h-1.5" />
+        </div>
+      </div>
 
-          {/* Warning if missing critical items */}
-          {!hasCapitalGoodsList && totalPolicyDocs > 0 && (
-            <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-warning">
-                  የካፒታል ዕቃዎች ዝርዝር አልተገኘም (Capital Goods List Missing)
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Admin must upload policy documents containing the capital goods list before analysis can proceed.
-                </p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Capital goods list warning */}
+      {!hasCapitalGoodsList && totalPolicyDocs > 0 && (
+        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200/60">
+          <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Capital Goods List Missing</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Admin must upload policy documents containing the capital goods list before analysis can proceed.
+            </p>
+          </div>
+        </div>
+      )}
 
-      {/* Content (PolicyLibrary + DocumentUpload passed as children) */}
+      {/* Children (PolicyLibrary + DocumentUpload) */}
       {children}
 
-      {/* Analysis History Panel */}
+      {/* History panel */}
       {onLoadSession && onDeleteSession && (
         <AnalysisHistoryPanel
           sessions={sessions}
@@ -296,11 +295,11 @@ const DocumentPreparationStep = ({
         />
       )}
 
-      {/* No conclusions notice */}
-      <div className="flex items-center gap-2 p-4 rounded-lg bg-muted/30 border border-border text-sm text-muted-foreground">
-        <Lock className="h-4 w-4 shrink-0" />
+      {/* Footer notice */}
+      <div className="flex items-center gap-2 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">
+        <Lock className="h-3.5 w-3.5 shrink-0" />
         <span>
-          <span className="font-medium">ማሳሰቢያ:</span> በዚህ ደረጃ ምንም ውሳኔ አይደረግም። (No conclusions are made at this stage.)
+          <span className="font-semibold text-slate-600">Note:</span> No compliance conclusions are made at this stage. Complete all steps to generate an official decision.
         </span>
       </div>
     </div>

@@ -14,13 +14,6 @@ interface AppLayoutProps {
   className?: string;
 }
 
-/**
- * Three-zone layout for AAIC Policy Decision Support:
- * A. Top Bar (Persistent) - AAIC branding, navigation, officer profile
- * B. Left Vertical Flow Navigator - Process steps with sequential unlocking
- * C. Main Content Area - Step-specific content
- * D. Right Decision Trace Panel - Real-time analysis trace (collapsible)
- */
 const AppLayout = ({
   children,
   currentStep,
@@ -31,18 +24,15 @@ const AppLayout = ({
 }: AppLayoutProps) => {
   const { isAnalyzing, events, isPanelOpen } = useDecisionTrace();
 
-  // Show trace panel when analyzing or when there are events
   const showTracePanel = isAnalyzing || events.length > 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* A. Top Bar (Persistent) */}
+    <div className="min-h-screen flex flex-col bg-slate-50/50">
       <Header />
 
-      {/* Main Layout: Navigator + Content + Trace */}
       <div className="flex-1 flex">
-        {/* B. Left Vertical Flow Navigator */}
-        <aside className="hidden lg:flex w-64 shrink-0 border-r border-border bg-card">
+        {/* Left sidebar */}
+        <aside className="hidden lg:flex w-56 shrink-0 border-r border-slate-200 bg-white">
           <ProcessNavigator
             currentStep={currentStep}
             completedSteps={completedSteps}
@@ -51,15 +41,15 @@ const AppLayout = ({
           />
         </aside>
 
-        {/* C. Main Content Area */}
+        {/* Main content */}
         <main className={cn("flex-1 overflow-auto", className)}>
           {children}
         </main>
 
-        {/* D. Right Decision Trace Panel */}
+        {/* Right trace panel */}
         {showTracePanel && (
           <aside className={cn(
-            "hidden lg:flex shrink-0 transition-all duration-300",
+            "hidden lg:flex shrink-0 transition-all duration-300 border-l border-slate-200",
             isPanelOpen ? "w-80" : "w-0"
           )}>
             <DecisionTracePanel />
@@ -67,7 +57,6 @@ const AppLayout = ({
         )}
       </div>
 
-      {/* Floating trace toggle for mobile / when collapsed */}
       {showTracePanel && !isPanelOpen && (
         <div className="lg:hidden">
           <DecisionTracePanel />

@@ -355,7 +355,6 @@ const PolicyLibrary = () => {
             <p className="text-muted-foreground">
               Official Ministry of Finance policy documents — the permanent source of truth for compliance decisions.
             </p>
-            <p className="text-sm text-muted-foreground mt-1">የፖሊሲ ቤተ-መጽሐፍት • የውሳኔ ድጋፍ መሠረት</p>
           </div>
 
           {!authLoading && (
@@ -671,9 +670,6 @@ const PolicyLibrary = () => {
                     </div>
                   </div>
                   <CardTitle className="text-base mt-3 leading-snug">{doc.name}</CardTitle>
-                  {doc.name_amharic && (
-                    <p className="text-xs text-muted-foreground">{doc.name_amharic}</p>
-                  )}
                   {doc.directive_number && (
                     <p className="text-xs font-mono text-primary">Directive {doc.directive_number}</p>
                   )}
