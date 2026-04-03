@@ -517,9 +517,11 @@ Return valid JSON with all required fields.
     }
 
     // Update analysis completeness with clause binding stats
-    if (analysisResult.analysisCompleteness) {
+    if (analysisResult.analysisCompleteness && typeof analysisResult.analysisCompleteness === "object") {
       analysisResult.analysisCompleteness.itemsWithValidCitations = itemsWithClauseBound;
       analysisResult.analysisCompleteness.itemsDeferredForCitations = itemsWithoutClause;
+    } else if (analysisResult.analysisCompleteness) {
+      analysisResult.analysisCompleteness = { isComplete: true, itemsWithValidCitations: itemsWithClauseBound, itemsDeferredForCitations: itemsWithoutClause };
     }
 
     // Log analysis summary for debugging
