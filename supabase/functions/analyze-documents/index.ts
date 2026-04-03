@@ -245,9 +245,10 @@ Instructions:
 1. Extract license type verbatim from the license document
 2. Match license type to a guideline section in the Policy Clause Index
 3. Extract allowed capital goods categories for that license type
-4. For EACH invoice line item: bind a clause_id from the index, then determine eligibility
-5. Count invoice items exactly; produce one complianceItems entry per item
-6. Every citation must include: clause_id, documentName, articleSection, pageNumber, quote
+4. Analyze ALL line items from the invoice. Do not summarize or sample — process every single item.
+5. For EACH invoice line item: bind a clause_id from the index, then determine eligibility
+6. Count invoice items exactly; produce one complianceItems entry per item — no item may be omitted
+7. Every citation must include: clause_id, documentName, articleSection, pageNumber, quote
 
 Return valid JSON with all required fields.
 `;
@@ -257,7 +258,7 @@ Return valid JSON with all required fields.
     // Moonshot OpenAI-compatible API with json_object response format
     const body: any = {
       model: "moonshot-v1-8k",
-      max_tokens: 4000,
+      max_tokens: 6000,
       temperature: 0,
       response_format: { type: "json_object" },
       messages: [

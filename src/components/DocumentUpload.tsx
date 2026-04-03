@@ -1,5 +1,6 @@
 import { useState, useEffect, type ChangeEvent, type DragEvent, type ElementType } from "react";
 import { Upload, FileText, Receipt, CheckCircle2, X, Loader2 } from "lucide-react";
+import { extractTextFromFile } from "@/lib/pdfExtract";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -119,8 +120,35 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
       });
     }
 
-    // For PDFs and images, use AI-powered parsing
-    if (file.type === "application/pdf" || file.type.startsWith("image/")) {
+    // For PDFs: extract text client-side (Moonshot does not support binary PDF input)
+    if (file.type === "application/pdf") {
+      try {
+        updateCaseImportStage("OCR_AND_TEXT_EXTRACTION");
+        updateDocumentStatus(file.name, { status: "processing", progress: 25 });
+        toast.info(`Extracting text from ${file.name}...`);
+
+        const extractedText = await extractTextFromFile(file);
+
+        if (extractedText && extractedText.length > 100) {
+          updateDocumentStatus(file.name, { status: "complete", progress: 100 });
+          toast.success(`Successfully extracted text from ${file.name}`);
+          return extractedText;
+        }
+
+        // Fallback message if PDF had no extractable text (scanned image PDF)
+        updateDocumentStatus(file.name, { status: "error", error: "No text found in PDF" });
+        toast.error(`No extractable text in ${file.name}. Try a text-based PDF.`);
+        return `[No text extracted from ${file.name} — PDF may be a scanned image]`;
+      } catch (err: any) {
+        console.error("PDF extraction error:", err);
+        updateDocumentStatus(file.name, { status: "error", error: err.message || "PDF extraction failed" });
+        toast.error(`Error extracting text from ${file.name}`);
+        return `[PDF extraction error for ${file.name}: ${err.message || "Unknown error"}]`;
+      }
+    }
+
+    // For images, use AI-powered parsing via edge function
+    if (file.type.startsWith("image/")) {
       // Check file size - limit to 10MB for reliable transmission
       const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
       if (file.size > MAX_FILE_SIZE) {
@@ -133,7 +161,7 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
         updateCaseImportStage("OCR_AND_TEXT_EXTRACTION");
         updateDocumentStatus(file.name, { status: "processing", progress: 25 });
         toast.info(`Parsing ${file.name}...`);
-        
+
         // Convert file to base64
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -143,7 +171,7 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
             const base64Data = result.split(",")[1];
             resolve(base64Data);
           };
-          reader.onerror = (err) => reject(new Error("Failed to read file"));
+          reader.onerror = () => reject(new Error("Failed to read file"));
           reader.readAsDataURL(file);
         });
 
@@ -165,7 +193,6 @@ const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
             });
 
             if (error) {
-              // Check if it's a network/size error
               if (error.message?.includes("Load failed") || error.message?.includes("Failed to send")) {
                 throw new Error("Network request failed - file may be too large");
               }
