@@ -67,119 +67,101 @@ serve(async (req) => {
       throw new Error("No file data provided");
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not configured");
     }
 
-    // Determine the correct MIME type for the AI model
-    let mimeType = fileType;
+    // Determine media type for Anthropic vision/document API
+    let mediaType: string;
+    let contentBlockType: "image" | "document";
     if (fileType === "application/pdf") {
-      mimeType = "application/pdf";
+      mediaType = "application/pdf";
+      contentBlockType = "document";
     } else if (fileType.startsWith("image/")) {
-      mimeType = fileType;
+      mediaType = fileType;
+      contentBlockType = "image";
     } else {
       return new Response(JSON.stringify({
         success: true,
-        extractedText: `[Document: ${fileName}]\n\nThis file type (${fileType}) cannot be automatically parsed. Please convert it to PDF first.`,
+        extractedText: `[Document: ${fileName}]\n\nThis file type (${fileType}) cannot be automatically parsed. Please convert it to PDF or an image format first.`,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Build the message with the image/PDF for text extraction
+    console.log("Calling Anthropic API for document parsing...");
+
+    // Helper: call Anthropic messages API with retry logic
+    async function callAnthropicWithRetry(
+      systemPrompt: string,
+      userContent: any[],
+      maxTokens: number,
+      maxRetries = 3,
+    ): Promise<string> {
+      let lastError: Error | null = null;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Anthropic attempt ${attempt}/${maxRetries}...`);
+
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "x-api-key": ANTHROPIC_API_KEY,
+              "anthropic-version": "2023-06-01",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "claude-3-5-sonnet-20241022",
+              max_tokens: maxTokens,
+              system: systemPrompt,
+              messages: [{ role: "user", content: userContent }],
+            }),
+          });
+
+          if (!res.ok) {
+            if (res.status === 429) throw { status: 429, message: "Rate limit exceeded. Please try again later." };
+            if (res.status === 529) throw { status: 529, message: "Anthropic API overloaded. Please try again." };
+            const errText = await res.text();
+            console.error(`Anthropic error (attempt ${attempt}):`, res.status, errText);
+            throw new Error(`Anthropic API error: ${res.status}`);
+          }
+
+          const data = await res.json();
+          const text = data?.content?.find((b: any) => b.type === "text")?.text;
+          if (!text) throw new Error("Empty response from Anthropic");
+          return text;
+
+        } catch (err: any) {
+          if (err.status === 429 || err.status === 529) throw err;
+          lastError = err instanceof Error ? err : new Error(String(err));
+          console.error(`Attempt ${attempt} failed:`, lastError.message);
+          if (attempt < maxRetries) {
+            await new Promise((r) => setTimeout(r, 1200 * attempt));
+          }
+        }
+      }
+
+      throw lastError || new Error("Anthropic API failed after retries");
+    }
+
+    // Build the user content block for this document
+    const documentBlock: any = contentBlockType === "document"
+      ? { type: "document", source: { type: "base64", media_type: mediaType, data: fileBase64 } }
+      : { type: "image", source: { type: "base64", media_type: mediaType, data: fileBase64 } };
+
     const userContent: any[] = [
+      documentBlock,
       {
         type: "text",
         text: `Please extract all text content from this document (${fileName}). Return only the extracted text, preserving the structure.`,
       },
-      {
-        type: "image_url",
-        image_url: {
-          url: `data:${mimeType};base64,${fileBase64}`,
-        },
-      },
     ];
 
-    console.log("Calling AI gateway for document parsing...");
-
-    // Helper function to call AI gateway with retry logic
-    async function callAIWithRetry(messages: any[], maxTokens: number, maxRetries = 3): Promise<any> {
-      let lastError: Error | null = null;
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`AI gateway attempt ${attempt}/${maxRetries}...`);
-          
-          const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
-              messages,
-              temperature: 0.1,
-              max_tokens: maxTokens,
-            }),
-          });
-
-          if (!response.ok) {
-            if (response.status === 429) {
-              throw { status: 429, message: "Rate limit exceeded. Please try again later." };
-            }
-            if (response.status === 402) {
-              throw { status: 402, message: "AI credits exhausted. Please add funds to continue." };
-            }
-            const errorText = await response.text();
-            console.error(`AI gateway error (attempt ${attempt}):`, response.status, errorText);
-            throw new Error(`AI gateway error: ${response.status}`);
-          }
-
-          const responseText = await response.text();
-          if (!responseText || responseText.trim() === '') {
-            console.warn(`Empty response on attempt ${attempt}, retrying...`);
-            lastError = new Error("Empty response from AI gateway");
-            
-            // Wait before retry with exponential backoff
-            if (attempt < maxRetries) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-              continue;
-            }
-            throw lastError;
-          }
-
-          const aiResponse = JSON.parse(responseText);
-          return aiResponse;
-          
-        } catch (error: any) {
-          // Re-throw rate limit and credit errors immediately
-          if (error.status === 429 || error.status === 402) {
-            throw error;
-          }
-          
-          lastError = error instanceof Error ? error : new Error(String(error));
-          console.error(`Attempt ${attempt} failed:`, lastError.message);
-          
-          if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-          }
-        }
-      }
-      
-      throw lastError || new Error("AI gateway failed after retries");
-    }
-
-    let aiResponse;
+    let extractedText: string;
     try {
-      aiResponse = await callAIWithRetry(
-        [
-          { role: "system", content: TEXT_EXTRACTION_PROMPT },
-          { role: "user", content: userContent },
-        ],
-        16000
-      );
+      extractedText = await callAnthropicWithRetry(TEXT_EXTRACTION_PROMPT, userContent, 16000);
     } catch (error: any) {
       if (error.status === 429) {
         return new Response(JSON.stringify({ error: error.message }), {
@@ -187,52 +169,31 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (error.status === 402) {
-        return new Response(JSON.stringify({ error: error.message }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       throw error;
     }
-    
-    console.log("Document parsed successfully");
 
-    const extractedText = aiResponse.choices?.[0]?.message?.content;
-    if (!extractedText) {
-      throw new Error("No content in AI response");
-    }
+    console.log("Document parsed successfully, text length:", extractedText.length);
 
     // If metadata extraction is requested, make a second call to extract structured data
     let metadata = null;
     if (extractMetadata) {
       console.log("Extracting policy metadata...");
-      
       try {
-        const metadataAiResponse = await callAIWithRetry(
-          [
-            { role: "system", content: POLICY_METADATA_PROMPT },
-            { role: "user", content: `Extract metadata from this policy document:\n\n${extractedText.substring(0, 8000)}` },
-          ],
+        const metadataText = await callAnthropicWithRetry(
+          POLICY_METADATA_PROMPT,
+          [{ type: "text", text: `Extract metadata from this policy document:\n\n${extractedText.substring(0, 8000)}` }],
           1000,
-          2 // Fewer retries for metadata since it's optional
+          2,
         );
-        
-        const metadataText = metadataAiResponse.choices?.[0]?.message?.content;
-        
-        if (metadataText) {
-          // Extract JSON from the response (handle markdown code blocks)
-          let jsonStr = metadataText;
-          const jsonMatch = metadataText.match(/```(?:json)?\s*([\s\S]*?)```/);
-          if (jsonMatch) {
-            jsonStr = jsonMatch[1].trim();
-          }
-          metadata = JSON.parse(jsonStr);
-          console.log("Metadata extracted:", metadata);
-        }
+
+        let jsonStr = metadataText;
+        const jsonMatch = metadataText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) jsonStr = jsonMatch[1].trim();
+        metadata = JSON.parse(jsonStr);
+        console.log("Metadata extracted:", metadata);
       } catch (parseErr) {
         console.error("Failed to extract metadata:", parseErr);
-        // Continue without metadata - it's optional
+        // Continue without metadata — it's optional
       }
     }
 

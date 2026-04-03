@@ -146,26 +146,27 @@ async function performExtraction(
     console.log(`[BG] Document name: ${documentName}`);
     console.log(`[BG] Text length: ${documentText.length} characters`);
 
-    // Call AI to extract clauses
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    // Call Anthropic API to extract clauses
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
-      throw new Error("LOVABLE_API_KEY not configured");
+      throw new Error("ANTHROPIC_API_KEY not configured");
     }
 
-// Use GPT-4.1 for Policy Reader / Indexer Model
-    // GPT-4.1 supports very long context and is recommended for structured document parsing
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "openai/gpt-5", // Using GPT-5 for robust long-context parsing and clause extraction
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 64000,
+        temperature: 0,
+        system: EXTRACTION_PROMPT,
         messages: [
-          { role: "system", content: EXTRACTION_PROMPT },
-          { 
-            role: "user", 
+          {
+            role: "user",
             content: `Extract all clauses from this policy document.
 
 Document Name: ${documentName || "Unknown"}
@@ -176,33 +177,39 @@ ${documentText.substring(0, 120000)}
 --- END DOCUMENT TEXT ---
 
 Return the JSON structure as specified. Be thorough - extract EVERY article and EVERY item from annexes/schedules.
-CRITICAL: Every clause MUST have a page_number. No page number = unusable for decisions.`
-          }
+CRITICAL: Every clause MUST have a page_number. No page number = unusable for decisions.`,
+          },
         ],
-        temperature: 0,
-        max_tokens: 64000,
-        response_format: { type: "json_object" }
       }),
     });
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("[BG] AI API error:", errorText);
-      throw new Error(`AI API error: ${aiResponse.status}`);
+      console.error("[BG] Anthropic API error:", errorText);
+      throw new Error(`Anthropic API error: ${aiResponse.status}`);
     }
 
     const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content;
+    const content = aiData?.content?.find((b: any) => b.type === "text")?.text;
 
     if (!content) {
-      throw new Error("No content in AI response");
+      throw new Error("No content in Anthropic response");
     }
 
-    console.log("[BG] AI response received, parsing...");
+    console.log("[BG] Anthropic response received, parsing...");
 
+    // Extract JSON from response (handle markdown code fences)
     let extractedData;
     try {
-      extractedData = JSON.parse(content);
+      let jsonStr = content.trim();
+      const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (fenceMatch) jsonStr = fenceMatch[1].trim();
+      const firstBrace = jsonStr.indexOf("{");
+      const lastBrace = jsonStr.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+      }
+      extractedData = JSON.parse(jsonStr);
     } catch (parseError) {
       console.error("[BG] Failed to parse AI response:", content.substring(0, 500));
       throw new Error("Failed to parse AI response as JSON");

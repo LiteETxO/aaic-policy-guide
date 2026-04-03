@@ -903,9 +903,9 @@ serve(async (req) => {
     console.log("Invoice text length:", invoiceText?.length || 0);
     console.log("Policy documents count:", policyDocuments?.length || 0);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not configured");
     }
 
     // Initialize Supabase client for cache and policy clause operations
@@ -1148,27 +1148,22 @@ For each item, first retrieve applicable clauses, then bind them, then reason.
 Provide your analysis in the specified JSON format with traceable clause_id references.
 `;
 
-    console.log("Calling AI gateway...");
+    console.log("Calling Anthropic API (claude-3-5-sonnet)...");
 
-// Use GPT-5 for Decision Reasoner Model
-    // GPT-5 is recommended for complex multi-step reasoning and policy application
-    // CRITICAL: GPT-5 must NEVER "invent" clauses - only reason from indexed clauses
+    // Anthropic messages API with tool use to force structured JSON output
     const body: any = {
-      model: "google/gemini-3-flash-preview",
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 32000,
+      temperature: 0,
+      system: SYSTEM_PROMPT,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0,  // Deterministic results for consistency
-      max_completion_tokens: 32000,  // GPT-5 uses max_completion_tokens instead of max_tokens
-      // Use tool-calling to force a valid JSON payload (much more reliable than free-form JSON text).
       tools: [
         {
-          type: "function",
-          function: {
-            name: "return_policy_analysis",
-            description: "Return the full analysis as a single JSON object matching the required output format.",
-            parameters: {
+          name: "return_policy_analysis",
+          description: "Return the full analysis as a single JSON object matching the required output format.",
+          input_schema: {
               type: "object",
               properties: {
                 documentComprehension: { 
@@ -1369,20 +1364,21 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
           },
         },
       ],
-      tool_choice: { type: "function", function: { name: "return_policy_analysis" } },
+      tool_choice: { type: "tool", name: "return_policy_analysis" },
     };
 
-    // Create abort controller for timeout (keep under typical client/proxy limits)
+    // Create abort controller for timeout
     const controller = new AbortController();
-    const timeoutMs = 90_000;  // Increased for Gemini's processing time with large invoices
+    const timeoutMs = 120_000;
     const timeoutId = setTimeout(() => controller.abort("timeout"), timeoutMs);
 
     let response: Response;
     try {
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
@@ -1392,7 +1388,7 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
       clearTimeout(timeoutId);
       const isAbort = fetchError?.name === "AbortError" || fetchError?.message?.includes?.("aborted");
       if (isAbort) {
-        console.error(`AI gateway request timed out after ${timeoutMs}ms`);
+        console.error(`Anthropic API request timed out after ${timeoutMs}ms`);
         return new Response(
           JSON.stringify({
             success: false,
@@ -1409,17 +1405,17 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.error("Anthropic API error:", response.status, errorText);
       return new Response(
         JSON.stringify({
           success: false,
           error:
             response.status === 429
               ? "Rate limit exceeded. Please try again later."
-              : response.status === 402
-                ? "AI credits exhausted. Please add funds to continue."
+              : response.status === 402 || response.status === 529
+                ? "Anthropic API quota exceeded. Please check your API key and billing."
                 : "AI service returned an error. Please retry.",
-          code: `AI_GATEWAY_${response.status}`,
+          code: `ANTHROPIC_${response.status}`,
           rawErrorSnippet: errorText.slice(0, 1500),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -1430,31 +1426,29 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
     try {
       aiResponse = await response.json();
     } catch (jsonError) {
-      console.error("Failed to parse AI gateway response as JSON:", jsonError);
+      console.error("Failed to parse Anthropic response as JSON:", jsonError);
       return new Response(
         JSON.stringify({
           success: false,
           error: "Invalid response from AI service. Please try again.",
-          code: "AI_GATEWAY_INVALID_JSON",
+          code: "ANTHROPIC_INVALID_JSON",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    console.log("AI response received");
+    console.log("Anthropic response received, stop_reason:", aiResponse?.stop_reason);
 
-    // OpenAI-compatible responses typically use `choices[0].message`.
-    // Some providers return structured content (arrays/parts). Be defensive.
-    const choice = aiResponse?.choices?.[0];
-    const msg = choice?.message;
-    const finishReason = choice?.finish_reason ?? choice?.finishReason ?? null;
+    const truncate = (s: string, max = 8000) =>
+      s.length > max ? `${s.slice(0, max)}\n...[truncated ${s.length - max} chars]` : s;
+
+    // Anthropic returns content as an array; find the tool_use block
+    const contentBlocks: any[] = aiResponse?.content ?? [];
+    const toolUseBlock = contentBlocks.find((b: any) => b.type === "tool_use");
+    const textBlock = contentBlocks.find((b: any) => b.type === "text");
 
     const tryParseJson = (input: string) => {
       const trimmed = input.trim();
-      try {
-        return JSON.parse(trimmed);
-      } catch {
-        return null;
-      }
+      try { return JSON.parse(trimmed); } catch { return null; }
     };
 
     const stripCodeFences = (text: string) => {
@@ -1465,114 +1459,44 @@ Provide your analysis in the specified JSON format with traceable clause_id refe
       return s.trim();
     };
 
-    const extractJsonObject = (text: string) => {
-      const s = stripCodeFences(text);
-      const first = s.indexOf("{");
-      const last = s.lastIndexOf("}");
-      if (first !== -1 && last !== -1 && last > first) return s.slice(first, last + 1);
-      return null;
-    };
-
-    const repairJson = (text: string) => {
-      // Remove common trailing commas that break JSON parsing.
-      return text.replace(/,\s*([}\]])/g, "$1");
-    };
+    const repairJson = (text: string) =>
+      text.replace(/,\s*([}\]])/g, "$1");
 
     const parseFromText = (text: string) => {
       const cleaned = stripCodeFences(text);
       const direct = tryParseJson(cleaned);
       if (direct) return direct;
-
-      const extracted = extractJsonObject(cleaned);
-      if (extracted) {
-        const extractedDirect = tryParseJson(extracted);
-        if (extractedDirect) return extractedDirect;
-        const repaired = tryParseJson(repairJson(extracted));
-        if (repaired) return repaired;
+      const first = cleaned.indexOf("{"), last = cleaned.lastIndexOf("}");
+      if (first !== -1 && last > first) {
+        const extracted = cleaned.slice(first, last + 1);
+        return tryParseJson(extracted) ?? tryParseJson(repairJson(extracted));
       }
-
-      const repairedDirect = tryParseJson(repairJson(cleaned));
-      if (repairedDirect) return repairedDirect;
-
-      return null;
+      return tryParseJson(repairJson(cleaned));
     };
-
-    const truncate = (s: string, max = 8000) =>
-      s.length > max ? `${s.slice(0, max)}\n...[truncated ${s.length - max} chars]` : s;
-
-    const extractText = (value: any): string => {
-      if (!value) return "";
-      if (typeof value === "string") return value;
-      if (Array.isArray(value)) {
-        // e.g. [{type:"text", text:"..."}] or [{text:"..."}] etc.
-        return value.map((p) => (typeof p === "string" ? p : (p?.text ?? p?.content ?? ""))).join("");
-      }
-      if (typeof value === "object") {
-        // e.g. { text: "..." } or { parts: [...] }
-        if (typeof (value as any).text === "string") return (value as any).text;
-        if (Array.isArray((value as any).parts)) return extractText((value as any).parts);
-        if (Array.isArray((value as any).content)) return extractText((value as any).content);
-      }
-      return "";
-    };
-
-    // Prefer tool-call arguments (forced JSON), otherwise fallback to text parsing.
-    const toolArgsCandidate = (msg as any)?.tool_calls?.[0]?.function?.arguments ??
-      (msg as any)?.function_call?.arguments ??
-      (msg as any)?.toolCalls?.[0]?.function?.arguments;
-
-    const toolArgs = typeof toolArgsCandidate === "string"
-      ? toolArgsCandidate
-      : (toolArgsCandidate ? JSON.stringify(toolArgsCandidate) : undefined);
-
-    // Some models return structured content arrays; extract into a plain string.
-    const content: string = extractText((msg as any)?.content);
 
     let analysisResult: any = null;
 
-    if (toolArgs) {
-      analysisResult = parseFromText(toolArgs);
+    // Prefer structured tool_use input (already parsed JSON object from Anthropic)
+    if (toolUseBlock?.input && typeof toolUseBlock.input === "object") {
+      analysisResult = toolUseBlock.input;
+    } else if (toolUseBlock?.input && typeof toolUseBlock.input === "string") {
+      analysisResult = parseFromText(toolUseBlock.input);
+    } else if (textBlock?.text) {
+      analysisResult = parseFromText(textBlock.text);
     }
 
-    if (!analysisResult && content) {
-      analysisResult = parseFromText(content);
-    }
-
-    // If the gateway returned an error-like payload with no message, surface that.
-    if (!analysisResult && !toolArgs && !content) {
-      const aiSnippet = truncate(JSON.stringify(aiResponse ?? {}), 2000);
-      console.error("AI response had no content/tool args", { finishReason, aiSnippet });
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "AI returned an empty response. Please retry.",
-          code: "AI_EMPTY_RESPONSE",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
+    const finishReason = aiResponse?.stop_reason;
 
     if (!analysisResult) {
-      const raw = toolArgs || content || "";
-      const reason = finishReason === "length" ? "MODEL_OUTPUT_TRUNCATED" : "INVALID_JSON";
-      console.error("Failed to parse AI response as JSON", {
-        finishReason,
-        reason,
-        hasToolArgs: !!toolArgs,
-        contentLen: content.length,
-      });
-
-      // IMPORTANT: Do NOT echo the full raw model output back to the client (it can be huge and break the connection).
+      const aiSnippet = truncate(JSON.stringify(aiResponse ?? {}), 2000);
+      console.error("Anthropic response had no parseable content", { finishReason, aiSnippet });
       return new Response(
         JSON.stringify({
           success: false,
-          error:
-            reason === "MODEL_OUTPUT_TRUNCATED"
-              ? "AI output was truncated. Try shorter policy docs or fewer invoice items."
-              : "AI returned an invalid response. Please retry.",
-          parseError: true,
-          parseErrorReason: reason,
-          rawResponseSnippet: truncate(raw),
+          error: finishReason === "max_tokens"
+            ? "AI output was truncated. Try shorter policy docs or fewer invoice items."
+            : "AI returned an empty or invalid response. Please retry.",
+          code: "AI_EMPTY_RESPONSE",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
