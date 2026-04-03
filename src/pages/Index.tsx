@@ -1,233 +1,195 @@
-import { useState, useMemo, useCallback } from "react";
-import { AppLayout } from "@/components/layout";
-import { 
-  DocumentPreparationStep,
-  ItemAnalysisStep,
-  EvidenceReviewStep,
-  ExecutiveSummaryStep,
-  FormalReportStep 
-} from "@/components/steps";
-import PolicyLibrary from "@/components/PolicyLibrary";
+import { useState, useCallback } from "react";
+import Header from "@/components/Header";
 import DocumentUpload from "@/components/DocumentUpload";
-import { ReportGenerator } from "@/components/report/ReportGenerator";
-import { usePolicyDocuments } from "@/hooks/usePolicyDocuments";
-import { useWorkflowStatus } from "@/hooks/useWorkflowStatus";
+import { AnalysisReport } from "@/components/AnalysisReport";
 import { useAnalysisSessions, type AnalysisSession } from "@/hooks/useAnalysisSessions";
-import type { ConfidenceLevel } from "@/components/gamification";
+import { useWorkflowStatus } from "@/hooks/useWorkflowStatus";
+import { FileText, Trash2, Loader2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const Index = () => {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [view, setView] = useState<"upload" | "report">("upload");
   const [analysisData, setAnalysisData] = useState<any>(null);
-  const [selectedEvidenceItem, setSelectedEvidenceItem] = useState(0);
-  
-  const { data: policyDocuments = [], isLoading: policyLoading } = usePolicyDocuments();
-  const { status, reset } = useWorkflowStatus();
-  const { 
-    sessions, 
-    isLoading: sessionsLoading, 
+
+  const { reset } = useWorkflowStatus();
+  const {
+    sessions,
+    isLoading: sessionsLoading,
     currentSessionId,
     setCurrentSessionId,
-    saveSession, 
+    saveSession,
     deleteSession,
     isDeleting,
-    isSaving
   } = useAnalysisSessions();
 
-  // Determine completed steps based on workflow status (now 5 steps)
-  const completedSteps = useMemo(() => {
-    const completed: number[] = [];
-    // Step 1: Document Preparation - complete when policy & case files ready
-    if (status.policyLibraryReady && policyDocuments.length > 0 && status.caseFilesReady) {
-      completed.push(1);
-    }
-    // Steps 2-4: Complete after analysis
-    if (analysisData?.complianceItems?.length > 0) {
-      completed.push(2); // Item Analysis
-      completed.push(3); // Evidence Review
-      completed.push(4); // Executive Summary
-    }
-    return completed;
-  }, [status, policyDocuments, analysisData]);
+  const handleAnalyze = useCallback(
+    async (result: any) => {
+      setAnalysisData(result);
+      setView("report");
+      try {
+        await saveSession({ analysisResult: result, status: "complete" });
+      } catch (err) {
+        console.error("Failed to save session:", err);
+      }
+    },
+    [saveSession]
+  );
 
-  // Determine blocked steps
-  const blockedSteps = useMemo(() => {
-    const blocked: { step: number; reason: string }[] = [];
-    if (status.state === "BLOCKED" && status.blockingReason) {
-      blocked.push({ step: currentStep, reason: status.blockingReason });
-    }
-    return blocked;
-  }, [status, currentStep]);
+  const handleLoadSession = useCallback(
+    (session: AnalysisSession) => {
+      setAnalysisData(session.analysis_result);
+      setCurrentSessionId(session.id);
+      setView("report");
+    },
+    [setCurrentSessionId]
+  );
 
-  // Handle analysis completion - save to database
-  const handleAnalyze = useCallback(async (result: any) => {
-    setAnalysisData(result);
-    setCurrentStep(2); // Move to Item Analysis after analysis
-    
-    // Save the session to database
-    try {
-      await saveSession({
-        analysisResult: result,
-        status: "complete",
-      });
-    } catch (error) {
-      console.error("Failed to save session:", error);
-    }
-  }, [saveSession]);
+  const handleDeleteSession = useCallback(
+    async (id: string) => {
+      await deleteSession(id);
+      if (id === currentSessionId) {
+        setAnalysisData(null);
+        setCurrentSessionId(null);
+        setView("upload");
+        reset();
+      }
+    },
+    [deleteSession, currentSessionId, setCurrentSessionId, reset]
+  );
 
-  const handleStepClick = (step: number) => {
-    setCurrentStep(step);
-  };
-
-  // Clear current analysis and start fresh
-  const handleClearAnalysis = useCallback(() => {
+  const handleNewAnalysis = useCallback(() => {
+    setView("upload");
     setAnalysisData(null);
-    setCurrentStep(1);
     setCurrentSessionId(null);
     reset();
   }, [reset, setCurrentSessionId]);
 
-  // Load a previous session
-  const handleLoadSession = useCallback((session: AnalysisSession) => {
-    setAnalysisData(session.analysis_result);
-    setCurrentSessionId(session.id);
-    setCurrentStep(2); // Go to Item Analysis
-  }, [setCurrentSessionId]);
-
-  // Delete a session
-  const handleDeleteSession = useCallback(async (id: string) => {
-    await deleteSession(id);
-    // If we deleted the current session, clear analysis
-    if (id === currentSessionId) {
-      handleClearAnalysis();
-    }
-  }, [deleteSession, currentSessionId, handleClearAnalysis]);
-
-  // Transform analysis data for step components
-  const analysisItems = useMemo(() => {
-    if (!analysisData?.complianceItems) return [];
-    return analysisData.complianceItems.map((item: any) => ({
-      itemNumber: item.itemNumber,
-      invoiceItem: item.invoiceItem,
-      normalizedName: item.normalizedName || item.invoiceItem,
-      licenseAlignment: item.licenseAlignment || "Needs Clarification",
-      policyMatch: item.matchResult === "Exact" ? "Listed" : 
-                   item.matchResult === "Mapped" ? "Mapped" : "Not Listed",
-      essentialityStatus: item.essentialityAnalysis ? "Complete" : "Pending",
-      evidenceCount: item.citations?.length || 0,
-      citations: item.citations || [],
-      analysisStatus: item.eligibilityStatus?.startsWith("Eligible") ? "analysis_complete" as const :
-                      item.eligibilityStatus === "Requires Clarification" ? "requires_clarification" as const :
-                      "evidence_pending" as const,
-      confidence: (item.citations?.length > 0 && item.reasoning?.length > 0 ? "high" : 
-                  item.citations?.length > 0 ? "medium" : "low") as ConfidenceLevel,
-    }));
-  }, [analysisData]);
-
-  const evidenceItems = useMemo(() => {
-    return analysisItems.map((item: any) => ({
-      itemNumber: item.itemNumber,
-      itemName: item.normalizedName,
-      citations: item.citations,
-      essentialityAnalysis: analysisData?.complianceItems?.find(
-        (c: any) => c.itemNumber === item.itemNumber
-      )?.essentialityAnalysis,
-      confidence: item.confidence,
-    }));
-  }, [analysisItems, analysisData]);
-
-  const executiveSummary = useMemo(() => {
-    if (!analysisData?.executiveSummary) {
-      return {
-        overallStatus: "Pending",
-        eligibleCount: 0,
-        clarificationCount: 0,
-        deferredCount: 0,
-        topIssues: [],
-        additionalInfoNeeded: [],
-        overallConfidence: "low" as ConfidenceLevel,
-      };
-    }
-    return {
-      overallStatus: analysisData.executiveSummary.overallStatus || "Mixed",
-      eligibleCount: analysisData.executiveSummary.eligibleCount || 0,
-      clarificationCount: analysisData.executiveSummary.clarificationCount || 0,
-      deferredCount: analysisData.executiveSummary.notEligibleCount || 0,
-      topIssues: analysisData.executiveSummary.topIssues || [],
-      additionalInfoNeeded: analysisData.executiveSummary.additionalInfoNeeded || [],
-      overallConfidence: (analysisItems.filter((i: any) => i.confidence === "high").length > 
-                         analysisItems.length / 2 ? "high" : "medium") as ConfidenceLevel,
-    };
-  }, [analysisData, analysisItems]);
-
-  // Render step content based on current step (now 5 steps)
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <DocumentPreparationStep 
-            policyDocuments={policyDocuments.map(doc => ({
-              id: doc.id,
-              name: doc.name,
-              nameAmharic: doc.name_amharic || undefined,
-              directiveNumber: doc.directive_number || undefined,
-              status: doc.status,
-              documentType: doc.document_type,
-            }))}
-            uploadedDocuments={status.documentStatuses.map((d, i) => ({
-              id: `doc-${i}`,
-              name: d.name,
-              type: d.type as "license" | "invoice",
-              status: d.status,
-            }))}
-            licenseUploaded={status.documentStatuses.some(d => d.type === "license" && d.status === "complete")}
-            invoiceUploaded={status.documentStatuses.some(d => d.type === "invoice" && d.status === "complete")}
-            isPolicyLoading={policyLoading}
-            hasActiveAnalysis={!!analysisData}
-            onClearAnalysis={handleClearAnalysis}
-            onViewResults={() => setCurrentStep(2)}
-            sessions={sessions}
-            sessionsLoading={sessionsLoading}
-            currentSessionId={currentSessionId}
-            onLoadSession={handleLoadSession}
-            onDeleteSession={handleDeleteSession}
-            isDeleting={isDeleting}
-          >
-            <PolicyLibrary />
-            <DocumentUpload onAnalyze={handleAnalyze} />
-          </DocumentPreparationStep>
-        );
-      case 2:
-        return <ItemAnalysisStep items={analysisItems} />;
-      case 3:
-        return (
-          <EvidenceReviewStep 
-            evidenceItems={evidenceItems}
-            selectedItemIndex={selectedEvidenceItem}
-            onItemSelect={setSelectedEvidenceItem}
-          />
-        );
-      case 4:
-        return <ExecutiveSummaryStep summary={executiveSummary} />;
-      case 5:
-        return (
-          <FormalReportStep isReady={completedSteps.includes(4)}>
-            {analysisData && <ReportGenerator analysisData={analysisData} />}
-          </FormalReportStep>
-        );
-      default:
-        return null;
-    }
-  };
-
   return (
-    <AppLayout
-      currentStep={currentStep}
-      completedSteps={completedSteps}
-      blockedSteps={blockedSteps}
-      onStepClick={handleStepClick}
-    >
-      {renderStepContent()}
-    </AppLayout>
+    <div className="min-h-screen flex flex-col bg-slate-50/50">
+      <Header />
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* ── Left panel: Previous Analyses ── */}
+        <aside className="hidden lg:flex flex-col w-56 shrink-0 border-r border-slate-200 bg-white overflow-y-auto">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Previous Analyses
+            </h3>
+            {view === "report" && (
+              <button
+                onClick={handleNewAnalysis}
+                className="text-slate-400 hover:text-slate-700 transition-colors"
+                title="New Analysis"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {sessionsLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="p-4 text-xs text-slate-400 text-center leading-relaxed">
+              No previous analyses.
+              <br />
+              Run an analysis to see it here.
+            </div>
+          ) : (
+            <ul className="py-2 flex-1">
+              {sessions.map((session) => {
+                const result = session.analysis_result as any;
+                const name =
+                  result?.metadata?.investorName ||
+                  result?.metadata?.licenseNumber ||
+                  "Analysis";
+                const date = new Date(session.created_at).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "2-digit",
+                } as Intl.DateTimeFormatOptions);
+                const isActive = session.id === currentSessionId;
+                const itemCount = result?.complianceItems?.length ?? 0;
+
+                return (
+                  <li
+                    key={session.id}
+                    className={cn(
+                      "group flex items-start gap-2 mx-2 mb-0.5 rounded-lg px-2.5 py-2 cursor-pointer transition-colors",
+                      isActive
+                        ? "bg-blue-50 text-blue-700"
+                        : "hover:bg-slate-50 text-slate-700"
+                    )}
+                    onClick={() => handleLoadSession(session)}
+                  >
+                    <FileText
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0 mt-0.5",
+                        isActive ? "text-blue-500" : "text-slate-400"
+                      )}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{name}</p>
+                      <p className="text-[10px] text-slate-400">
+                        {date}
+                        {itemCount > 0 && ` · ${itemCount} items`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSession(session.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 mt-0.5 p-0.5 text-slate-400 hover:text-red-500 transition-all"
+                      disabled={isDeleting}
+                      title="Delete session"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {view === "report" && (
+            <div className="p-3 border-t border-slate-100">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs gap-1.5"
+                onClick={handleNewAnalysis}
+              >
+                <Plus className="h-3 w-3" />
+                New Analysis
+              </Button>
+            </div>
+          )}
+        </aside>
+
+        {/* ── Main content ── */}
+        <main className="flex-1 overflow-auto">
+          {view === "upload" ? (
+            <div className="max-w-3xl mx-auto px-6 py-10">
+              <div className="mb-8">
+                <h1 className="text-2xl font-bold text-slate-900">
+                  Generate Analysis Report
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  Upload the investment license and commercial invoice to run a
+                  compliance analysis under Directive 1064/2025.
+                </p>
+              </div>
+              <DocumentUpload onAnalyze={handleAnalyze} />
+            </div>
+          ) : (
+            <AnalysisReport analysisData={analysisData} onBack={handleNewAnalysis} />
+          )}
+        </main>
+      </div>
+    </div>
   );
 };
 
