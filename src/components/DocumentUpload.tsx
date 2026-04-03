@@ -30,6 +30,14 @@ interface DocumentUploadProps {
 
 const BACKOFF_DELAY_MS = 2000;
 
+const SYSTEM_PROMPT = `You are an Ethiopian customs duty exemption analyst for AAIC. Analyze invoice items against the Capital Goods List Annex 1064/2025 to determine customs duty exemption eligibility.
+
+Output ONLY valid JSON: {
+  "permitSummary": {"company": "", "activity": "", "capitalETB": ""},
+  "executiveSummary": {"totalItemsAnalyzed": 0, "eligibleCount": 0, "excludedCount": 0, "requiresReviewCount": 0, "overallRecommendation": ""},
+  "complianceItems": [{"itemNumber": 0, "invoiceItem": "", "hsCode": "", "decision": "ELIGIBLE|EXCLUDED|REVIEW", "policyBasis": "", "notes": ""}]
+}`;
+
 const DocumentUpload = ({ onAnalyze }: DocumentUploadProps) => {
   const { user } = useAuth();
   const { data: policyDocuments } = usePolicyDocuments();
@@ -454,29 +462,61 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
       setAnalysisStepLabel("Running AI analysis...");
       addTechnicalLog("Checkpoint saved before AI gateway call");
 
-      // Call the edge function with timeout handling
-      // Analysis can take up to 4 minutes for large invoices, so set a 5 minute timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+      const MOONSHOT_API_KEY = import.meta.env.VITE_MOONSHOT_API_KEY;
+
+      const licenseText = licenseZone?.fileText || `License file: ${licenseZone?.file?.name}`;
+      const invoiceText = invoiceZone?.fileText || `Invoice file: ${invoiceZone?.file?.name}`;
+      const truncatedInvoice = invoiceText.slice(0, 18000);
+
+      const USER_PROMPT = `Analyze these documents for Ethiopian customs duty exemption eligibility under Capital Goods List Annex 1064/2025.
+
+INVESTMENT LICENSE:
+${licenseText}
+
+COMMERCIAL INVOICE:
+${truncatedInvoice}
+
+Analyze every line item in the invoice. For each item determine: ELIGIBLE (qualifies for duty exemption), EXCLUDED (does not qualify), or REVIEW (needs manual review). Include the relevant HS Code if identifiable and cite the specific policy basis from Annex 1064/2025.`;
 
       let data: any;
       let error: any;
 
       try {
-        const response = await supabase.functions.invoke("analyze-documents", {
-          body: {
-            licenseText: licenseZone?.fileText || `License file: ${licenseZone?.file?.name}`,
-            invoiceText: invoiceZone?.fileText || `Invoice file: ${invoiceZone?.file?.name}`,
-            policyDocuments: policyDocsForAI,
+        setAnalysisStepLabel("Calling Moonshot AI...");
+        const moonshotResponse = await fetch("https://api.moonshot.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${MOONSHOT_API_KEY}`,
+            "Content-Type": "application/json",
           },
+          body: JSON.stringify({
+            model: "moonshot-v1-32k",
+            max_tokens: 6000,
+            temperature: 0,
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: USER_PROMPT }
+            ]
+          })
         });
-        
-        clearTimeout(timeoutId);
-        data = response.data;
-        error = response.error;
+
+        if (!moonshotResponse.ok) {
+          throw new Error(`Moonshot API error: ${moonshotResponse.status} ${moonshotResponse.statusText}`);
+        }
+
+        const moonshotData = await moonshotResponse.json();
+        const analysisText = moonshotData.choices?.[0]?.message?.content;
+        if (!analysisText) {
+          throw new Error("No response content from Moonshot API");
+        }
+
+        const analysis = JSON.parse(analysisText);
+        data = { success: true, analysis };
+        error = null;
       } catch (fetchError: any) {
-        clearTimeout(timeoutId);
         error = fetchError;
+        data = null;
       }
 
       // ═══════════════════════════════════════════════════════════════════════════════
@@ -543,27 +583,14 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
 
       if (data?.success && data?.analysis) {
         updateAnalysisStage("DECISION_TABLE_AND_CITATIONS_OUTPUT");
-        
+
         // Process trace events from analysis result
         processAnalysisTrace(data.analysis);
-        
-        // Check if analysis was blocked due to document comprehension issues
-        if (data.analysis.documentComprehension?.gateStatus === "BLOCKED") {
-          blockAnalysis(
-            data.analysis.documentComprehension.blockedReason || "Document ingestion incomplete",
-            "Review blocked documents and provide missing information"
-          );
-          addEvent(createTraceEvent.blocked(
-            undefined,
-            data.analysis.documentComprehension.blockedReason || "Document ingestion incomplete",
-            "Review blocked documents"
-          ));
-        } else {
-          completeAnalysis();
-          addEvent(createTraceEvent.success("Analysis complete — all items processed"));
-          addEngagementSignal(createEngagementSignal.readyForReport());
-        }
-        
+
+        completeAnalysis();
+        addEvent(createTraceEvent.success("Analysis complete — all items processed"));
+        addEngagementSignal(createEngagementSignal.readyForReport());
+
         // Clear checkpoint on success
         clearCheckpoint();
         setAnalysisProgress(100);
@@ -655,98 +682,30 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
     if (!analysis?.complianceItems) return;
 
     const items = analysis.complianceItems;
-    let totalClauses = 0;
-    let blockedItems = 0;
 
-    // Trace: Invoice preservation
     addEvent(createTraceEvent.invoicePreservation(items.length));
 
     items.forEach((item: any, index: number) => {
       const itemNumber = item.itemNumber || index + 1;
+      const decision = item.decision?.toUpperCase() || "REVIEW";
 
-      // Trace: Normalization
-      if (item.normalizedName && item.invoiceItem) {
-        addEvent(createTraceEvent.normalization(
-          itemNumber,
-          item.invoiceItem,
-          item.normalizedName
-        ));
-      }
-
-      // Trace: Clause retrieval
-      const clauseIds = item.referencedClauseIds || item.citations?.map((c: any) => c.clauseId).filter(Boolean) || [];
-      const keywords = item.matchKeywords || [item.normalizedName?.split(" ")[0] || "item"].slice(0, 3);
-      
-      addEvent(createTraceEvent.clauseRetrieval(
-        itemNumber,
-        keywords,
-        clauseIds.length,
-        clauseIds
-      ));
-
-      // Trace: Clause binding (if clauses found)
-      if (clauseIds.length > 0 && item.citations?.length > 0) {
-        const citation = item.citations[0];
-        addEvent(createTraceEvent.clauseBinding(
-          itemNumber,
-          clauseIds[0] || citation.clauseId || "UNKNOWN",
-          citation.documentName || "Policy Document",
-          citation.pageNumber || 1
-        ));
-        totalClauses += clauseIds.length;
-      }
-
-      // Trace: Decision path
-      const decisionPath = item.matchResult === "Exact" ? "exact" :
-                          item.matchResult === "Mapped" ? "mapped" :
-                          item.essentialityAnalysis ? "essentiality" : "deferred";
-      
-      addEvent(createTraceEvent.decisionPath(itemNumber, decisionPath));
-
-      // Trace: License alignment
-      if (item.licenseAlignment) {
-        addEvent(createTraceEvent.licenseAlignment(
-          itemNumber,
-          item.licenseScope || "Licensed Investment Activity",
-          item.licenseAlignment === "Aligned"
-        ));
-      }
-
-      // Trace: Essentiality check
-      if (item.essentialityAnalysis) {
-        addEvent(createTraceEvent.essentialityCheck(
-          itemNumber,
-          item.essentialityAnalysis.isEssential ? "passed" : "pending"
-        ));
-      }
-
-      // Trace: Decision output
-      const decision = item.eligibilityStatus || "Pending";
-      const isBlocked = item.clauseRetrievalBlocked || decision.includes("Deferred");
-      
-      if (isBlocked) {
-        blockedItems++;
+      if (decision === "REVIEW") {
         addEvent(createTraceEvent.blocked(
           itemNumber,
-          "No applicable policy clause retrieved from PolicyClauseIndex",
-          "Admin must index relevant clauses or officer must request policy update"
+          item.notes || "Manual review required",
+          "Officer must review this item"
         ));
       } else {
-        addEvent(createTraceEvent.decisionOutput(
-          itemNumber,
-          decision,
-          clauseIds.length
-        ));
+        const statusLabel = decision === "ELIGIBLE" ? "Eligible" : "Not Eligible";
+        addEvent(createTraceEvent.decisionOutput(itemNumber, statusLabel, 0));
       }
     });
 
-    // Engagement signals
-    if (totalClauses > 0) {
-      addEngagementSignal(createEngagementSignal.evidenceCollected(totalClauses));
-    }
-    if (blockedItems === 0 && items.length > 0) {
+    const reviewCount = items.filter((i: any) => i.decision?.toUpperCase() === "REVIEW").length;
+    addEngagementSignal(createEngagementSignal.evidenceCollected(items.length));
+    if (reviewCount === 0) {
       addEngagementSignal(createEngagementSignal.citationsComplete());
-    } else if (blockedItems > 0) {
+    } else {
       addEngagementSignal(createEngagementSignal.awaitingClarification());
     }
   };

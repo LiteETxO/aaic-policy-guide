@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Printer, ArrowLeft, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DecisionReportData, ComplianceItem, ActionItem } from "@/components/report/ReportTypes";
 
 interface AnalysisReportProps {
   analysisData: any;
@@ -11,10 +10,11 @@ interface AnalysisReportProps {
 
 type DecisionFilter = "ALL" | "ELIGIBLE" | "EXCLUDED" | "REVIEW";
 
-const getDecisionType = (status: string): "ELIGIBLE" | "EXCLUDED" | "REVIEW" => {
-  if (!status) return "REVIEW";
-  if (status.startsWith("Eligible")) return "ELIGIBLE";
-  if (status === "Not Eligible") return "EXCLUDED";
+const getDecisionType = (decision: string): "ELIGIBLE" | "EXCLUDED" | "REVIEW" => {
+  if (!decision) return "REVIEW";
+  const d = decision.toUpperCase();
+  if (d === "ELIGIBLE") return "ELIGIBLE";
+  if (d === "EXCLUDED") return "EXCLUDED";
   return "REVIEW";
 };
 
@@ -33,46 +33,31 @@ const DECISION_LABEL: Record<string, string> = {
 export const AnalysisReport = ({ analysisData, onBack }: AnalysisReportProps) => {
   const [filter, setFilter] = useState<DecisionFilter>("ALL");
 
-  const report = analysisData as DecisionReportData;
-  const metadata = report?.metadata;
-  const executive = report?.executiveSummary;
-  const items: ComplianceItem[] = report?.complianceItems || [];
-  const licenseSnapshot = report?.licenseSnapshot;
-  const reviewItems: ActionItem[] = report?.issuesAndClarifications || [];
+  const permitSummary = analysisData?.permitSummary || {};
+  const executive = analysisData?.executiveSummary || {};
+  const items: any[] = analysisData?.complianceItems || [];
 
   const dateGenerated = new Date().toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "long",
     year: "numeric",
   });
-  const reportRef =
-    metadata?.caseReferenceId || `AAIC-${Date.now().toString(36).toUpperCase()}`;
+  const reportRef = `AAIC-${Date.now().toString(36).toUpperCase()}`;
 
-  const totalItems = items.length;
-  const eligibleCount =
-    executive?.eligibleCount ??
-    items.filter((i) => getDecisionType(i.eligibilityStatus || "") === "ELIGIBLE").length;
-  const excludedCount =
-    (executive as any)?.notEligibleCount ??
-    items.filter((i) => getDecisionType(i.eligibilityStatus || "") === "EXCLUDED").length;
-  const reviewCount =
-    executive?.clarificationCount ??
-    items.filter((i) => getDecisionType(i.eligibilityStatus || "") === "REVIEW").length;
+  const totalItems = executive.totalItemsAnalyzed ?? items.length;
+  const eligibleCount = executive.eligibleCount ?? items.filter((i) => getDecisionType(i.decision) === "ELIGIBLE").length;
+  const excludedCount = executive.excludedCount ?? items.filter((i) => getDecisionType(i.decision) === "EXCLUDED").length;
+  const reviewCount = executive.requiresReviewCount ?? items.filter((i) => getDecisionType(i.decision) === "REVIEW").length;
 
   const filteredItems = useMemo(() => {
     if (filter === "ALL") return items;
-    return items.filter((item) => getDecisionType(item.eligibilityStatus || "") === filter);
+    return items.filter((item) => getDecisionType(item.decision) === filter);
   }, [items, filter]);
 
   const handlePrint = () => window.print();
 
-  const showReviewSection =
-    reviewItems.length > 0 ||
-    items.some((i) => getDecisionType(i.eligibilityStatus || "") === "REVIEW");
-
   return (
     <>
-      {/* Print styles injected via style tag */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
@@ -122,15 +107,9 @@ export const AnalysisReport = ({ analysisData, onBack }: AnalysisReportProps) =>
                 </div>
               </div>
               <div className="text-right text-xs text-slate-500 space-y-0.5">
-                <p>
-                  <span className="font-semibold">Date:</span> {dateGenerated}
-                </p>
-                <p>
-                  <span className="font-semibold">Ref:</span> {reportRef}
-                </p>
-                <p>
-                  <span className="font-semibold">Directive:</span> 1064/2025
-                </p>
+                <p><span className="font-semibold">Date:</span> {dateGenerated}</p>
+                <p><span className="font-semibold">Ref:</span> {reportRef}</p>
+                <p><span className="font-semibold">Directive:</span> 1064/2025</p>
               </div>
             </div>
             <hr className="border-slate-300" />
@@ -140,88 +119,33 @@ export const AnalysisReport = ({ analysisData, onBack }: AnalysisReportProps) =>
           <ReportSection title="1. Investment Permit Summary">
             <DetailTable
               rows={[
-                { label: "Company / Investor", value: metadata?.investorName || "—" },
-                { label: "Permit Number", value: metadata?.licenseNumber || "—" },
-                {
-                  label: "Licensed Activity",
-                  value: licenseSnapshot?.licensedActivity || "—",
-                },
-                { label: "Sector", value: licenseSnapshot?.sector || "—" },
-                {
-                  label: "Location / Scope",
-                  value: licenseSnapshot?.scopeOfOperation || "—",
-                },
-                {
-                  label: "Legal Basis",
-                  value:
-                    report?.policyBasis?.[0]?.documentName ||
-                    "Investment Capital Goods Exemption Directive No. 1064/2025",
-                },
+                { label: "Company / Investor", value: permitSummary.company || "—" },
+                { label: "Licensed Activity", value: permitSummary.activity || "—" },
+                { label: "Capital (ETB)", value: permitSummary.capitalETB || "—" },
+                { label: "Legal Basis", value: "Investment Capital Goods Exemption Directive No. 1064/2025" },
               ]}
             />
           </ReportSection>
 
-          {/* ── Section 2: Invoice Details ── */}
-          <ReportSection title="2. Invoice Details">
-            <DetailTable
-              rows={[
-                {
-                  label: "Total Line Items",
-                  value: String(
-                    report?.analysisCompleteness?.totalInvoiceItems || items.length
-                  ),
-                },
-                {
-                  label: "Items Analyzed",
-                  value: String(
-                    report?.analysisCompleteness?.analyzedItems || items.length
-                  ),
-                },
-                {
-                  label: "Invoice Language",
-                  value:
-                    report?.documentComprehension?.invoiceUnderstanding?.invoiceLanguage ||
-                    "—",
-                },
-                {
-                  label: "Readability Status",
-                  value:
-                    report?.documentComprehension?.invoiceUnderstanding?.readabilityStatus ||
-                    "—",
-                },
-                {
-                  label: "Analysis Date",
-                  value: metadata?.dateOfAnalysis || dateGenerated,
-                },
-                {
-                  label: "Prepared By",
-                  value:
-                    metadata?.preparedBy ||
-                    "AAIC Policy Decision Support System",
-                },
-              ]}
-            />
-          </ReportSection>
-
-          {/* ── Section 3: Executive Summary ── */}
-          <ReportSection title="3. Executive Summary">
+          {/* ── Section 2: Executive Summary ── */}
+          <ReportSection title="2. Executive Summary">
             <div className="grid grid-cols-4 gap-3 mb-4">
               <StatCard label="Total Items" value={totalItems} variant="slate" />
               <StatCard label="Eligible" value={eligibleCount} variant="emerald" />
               <StatCard label="Excluded" value={excludedCount} variant="red" />
               <StatCard label="Requires Review" value={reviewCount} variant="amber" />
             </div>
-            {executive?.recommendation && (
+            {executive.overallRecommendation && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-slate-700">
                 <span className="font-semibold text-blue-800">Recommendation: </span>
-                {executive.recommendation}
+                {executive.overallRecommendation}
               </div>
             )}
           </ReportSection>
 
-          {/* ── Section 4: Compliance Analysis ── */}
+          {/* ── Section 3: Compliance Analysis ── */}
           <ReportSection
-            title="4. Compliance Analysis"
+            title="3. Compliance Analysis"
             headerRight={
               <div className="no-print flex items-center gap-1.5">
                 {(["ALL", "ELIGIBLE", "EXCLUDED", "REVIEW"] as DecisionFilter[]).map((f) => (
@@ -251,54 +175,29 @@ export const AnalysisReport = ({ analysisData, onBack }: AnalysisReportProps) =>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 w-10">
-                      #
-                    </th>
-                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500">
-                      Item Description
-                    </th>
-                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 w-32">
-                      Category / Specs
-                    </th>
-                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 w-28">
-                      Decision
-                    </th>
-                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500">
-                      Policy Basis
-                    </th>
+                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 w-10">#</th>
+                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500">Item</th>
+                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 w-28">HS Code</th>
+                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 w-28">Decision</th>
+                    <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500">Policy Basis</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredItems.map((item, idx) => {
-                    const decision = getDecisionType(item.eligibilityStatus || "");
-                    const categoryOrSpecs = item.category || item.specs || "—";
-                    const citation = item.citations?.[0];
-                    const policyBasis = citation
-                      ? `${citation.documentName} — ${citation.articleSection}`
-                      : item.eligibilityStatus || "—";
-
+                    const decision = getDecisionType(item.decision);
                     return (
                       <tr
-                        key={item.itemNumber}
+                        key={item.itemNumber ?? idx}
                         className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/60"}
                       >
-                        <td className="py-2.5 px-3 text-slate-400 text-xs">
-                          {item.itemNumber}
-                        </td>
+                        <td className="py-2.5 px-3 text-slate-400 text-xs">{item.itemNumber}</td>
                         <td className="py-2.5 px-3">
-                          <p className="text-slate-800 font-medium text-sm leading-snug">
-                            {item.normalizedName || item.invoiceItem}
-                          </p>
-                          {item.normalizedName &&
-                            item.normalizedName !== item.invoiceItem && (
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                {item.invoiceItem}
-                              </p>
-                            )}
+                          <p className="text-slate-800 font-medium text-sm leading-snug">{item.invoiceItem}</p>
+                          {item.notes && (
+                            <p className="text-xs text-slate-400 mt-0.5">{item.notes}</p>
+                          )}
                         </td>
-                        <td className="py-2.5 px-3 text-slate-500 text-xs">
-                          {categoryOrSpecs}
-                        </td>
+                        <td className="py-2.5 px-3 text-slate-500 text-xs">{item.hsCode || "—"}</td>
                         <td className="py-2.5 px-3">
                           <span
                             className={cn(
@@ -309,21 +208,15 @@ export const AnalysisReport = ({ analysisData, onBack }: AnalysisReportProps) =>
                             {DECISION_LABEL[decision]}
                           </span>
                         </td>
-                        <td
-                          className="py-2.5 px-3 text-slate-500 text-xs max-w-xs"
-                          title={policyBasis}
-                        >
-                          <span className="line-clamp-2">{policyBasis}</span>
+                        <td className="py-2.5 px-3 text-slate-500 text-xs max-w-xs" title={item.policyBasis}>
+                          <span className="line-clamp-2">{item.policyBasis || "—"}</span>
                         </td>
                       </tr>
                     );
                   })}
                   {filteredItems.length === 0 && (
                     <tr>
-                      <td
-                        colSpan={5}
-                        className="py-10 text-center text-sm text-slate-400"
-                      >
+                      <td colSpan={5} className="py-10 text-center text-sm text-slate-400">
                         No items match the selected filter.
                       </td>
                     </tr>
@@ -333,70 +226,9 @@ export const AnalysisReport = ({ analysisData, onBack }: AnalysisReportProps) =>
             </div>
           </ReportSection>
 
-          {/* ── Section 5: Items Requiring Review ── */}
-          {showReviewSection && (
-            <ReportSection title="5. Items Requiring Review">
-              <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
-                {reviewItems.length > 0
-                  ? reviewItems.map((issue, idx) => (
-                      <div key={idx} className="p-4">
-                        <div className="flex items-start gap-3">
-                          <span
-                            className={cn(
-                              "mt-0.5 shrink-0 text-xs px-2 py-0.5 rounded-full border font-semibold",
-                              issue.severity === "high"
-                                ? "bg-red-50 text-red-700 border-red-200"
-                                : issue.severity === "medium"
-                                ? "bg-amber-50 text-amber-700 border-amber-200"
-                                : "bg-blue-50 text-blue-700 border-blue-200"
-                            )}
-                          >
-                            {issue.severity}
-                          </span>
-                          <div>
-                            <p className="text-sm text-slate-700">{issue.description}</p>
-                            {issue.resolutionAction && (
-                              <p className="text-xs text-slate-500 mt-1">
-                                <span className="font-medium">Action:</span>{" "}
-                                {issue.resolutionAction}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  : items
-                      .filter(
-                        (i) => getDecisionType(i.eligibilityStatus || "") === "REVIEW"
-                      )
-                      .map((item) => (
-                        <div key={item.itemNumber} className="p-4">
-                          <div className="flex items-start gap-3">
-                            <span className="mt-0.5 shrink-0 text-xs px-2 py-0.5 rounded-full border font-semibold bg-amber-50 text-amber-700 border-amber-200">
-                              review
-                            </span>
-                            <div>
-                              <p className="text-sm font-medium text-slate-700">
-                                Item {item.itemNumber}:{" "}
-                                {item.normalizedName || item.invoiceItem}
-                              </p>
-                              <p className="text-xs text-slate-500 mt-0.5">
-                                {item.eligibilityStatus} —{" "}
-                                {item.licenseEvidence ||
-                                  "Further review required"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-              </div>
-            </ReportSection>
-          )}
-
           {/* ── Footer ── */}
           <footer className="mt-12 pt-4 border-t border-slate-200 text-center text-xs text-slate-400">
-            Generated by AAIC Policy Decision Support System | Directive 1064/2025 |{" "}
-            {dateGenerated}
+            Generated by AAIC Policy Decision Support System | Directive 1064/2025 | {dateGenerated}
           </footer>
         </div>
       </div>
@@ -415,9 +247,7 @@ interface ReportSectionProps {
 const ReportSection = ({ title, children, headerRight }: ReportSectionProps) => (
   <section className="mb-8">
     <div className="flex items-center justify-between mb-3">
-      <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
-        {title}
-      </h2>
+      <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">{title}</h2>
       {headerRight}
     </div>
     {children}
