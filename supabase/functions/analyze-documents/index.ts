@@ -236,10 +236,10 @@ POLICY DOCUMENTS (reference only):
 ${policyContext}
 
 INVESTMENT LICENSE:
-${licenseText || "No license provided"}
+${(licenseText || "No license provided").slice(0, 3000)}
 
 COMMERCIAL INVOICE:
-${invoiceText || "No invoice provided"}
+${(invoiceText || "No invoice provided").slice(0, 18000)}
 
 Instructions:
 1. Extract license type verbatim from the license document
@@ -253,11 +253,11 @@ Instructions:
 Return valid JSON with all required fields.
 `;
 
-    console.log("Calling Moonshot API (moonshot-v1-8k)...");
+    console.log("Calling Moonshot API (moonshot-v1-32k)...");
 
     // Moonshot OpenAI-compatible API with json_object response format
     const body: any = {
-      model: "moonshot-v1-8k",
+      model: "moonshot-v1-32k",
       max_tokens: 6000,
       temperature: 0,
       response_format: { type: "json_object" },
