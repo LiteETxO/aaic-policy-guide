@@ -257,7 +257,7 @@ Return valid JSON with all required fields.
     // Moonshot OpenAI-compatible API with json_object response format
     const body: any = {
       model: "moonshot-v1-8k",
-      max_tokens: 2000,
+      max_tokens: 4000,
       temperature: 0,
       response_format: { type: "json_object" },
       messages: [
