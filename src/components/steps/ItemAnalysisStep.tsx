@@ -163,24 +163,24 @@ const buildReasoningData = (item: AnalysisItem): AIReasoningData => {
       },
     ],
     conclusion: item.policyMatch === "Listed" || item.policyMatch === "Mapped"
-      ? `${item.normalizedName} qualifies as duty-free capital good based on policy match.`
+      ? `${item.normalizedName || item.invoiceItem || "Item"} qualifies as duty-free capital good based on policy match.`
       : policyGapDetected
         ? `No clause directly excludes or disqualifies this item. Provisionally eligible pending supervisor confirmation.`
-        : `Analysis in progress for ${item.normalizedName}.`,
+        : `Analysis in progress for ${item.normalizedName || item.invoiceItem || "Item"}.`,
     conclusionAmharic: item.policyMatch === "Listed" || item.policyMatch === "Mapped"
-      ? `${item.normalizedName} በፖሊሲ ግጥጥም መሰረት ከቀረጥ ነፃ ካፒታል እቃ ነው።`
+      ? `${item.normalizedName || item.invoiceItem || "Item"} በፖሊሲ ግጥጥም መሰረት ከቀረጥ ነፃ ካፒታል እቃ ነው።`
       : policyGapDetected
         ? `ይህን ዕቃ የሚያወጣ ወይም ብቁ ያልሆነ ድንጋጌ የለም። ጊዜያዊ ብቁ - የአለቃ ማረጋገጫ ይጠበቃል።`
-        : `ለ${item.normalizedName} ትንተና በሂደት ላይ።`,
+        : `ለ${item.normalizedName || item.invoiceItem || "Item"} ትንተና በሂደት ላይ።`,
     policyGapDetected,
-    policyGapMessage: policyGapDetected 
+    policyGapMessage: policyGapDetected
       ? "No clause directly excludes or disqualifies this item."
       : undefined,
     keywordsExpanded: policyGapDetected ? [
       "electrical machinery",
-      "power infrastructure", 
+      "power infrastructure",
       "industrial equipment",
-      item.normalizedName.toLowerCase(),
+      (item.normalizedName || item.invoiceItem || "item").toLowerCase(),
     ] : undefined,
   };
 };
@@ -253,7 +253,7 @@ const transformToItemCardData = (item: AnalysisItem, totalItems: number): ItemCa
   return {
     itemNumber: item.itemNumber,
     totalItems,
-    itemName: item.normalizedName,
+    itemName: item.normalizedName || item.invoiceItem || "Item",
     invoiceReference: item.invoiceItem,
     equipmentType: item.equipmentType || "Capital Equipment",
     equipmentTypeAmharic: item.equipmentTypeAmharic || "ካፒታል መሣሪያ",

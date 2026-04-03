@@ -86,7 +86,7 @@ export interface MatchCandidate {
 export interface ComplianceItem {
   itemNumber: number;
   invoiceItem: string;
-  normalizedName: string;
+  normalizedName?: string;
   category?: string;
   specs?: string;
   invoiceRef?: string;

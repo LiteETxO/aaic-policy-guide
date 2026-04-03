@@ -365,7 +365,7 @@ const ItemizedAnalysisSection = ({ items }: { items: ComplianceItem[] }) => (
           <div className="flex justify-between items-start">
             <div>
               <span className="font-mono text-sm">#{item.itemNumber}</span>
-              <h4 className="font-semibold">{item.normalizedName}</h4>
+              <h4 className="font-semibold">{item.normalizedName || item.invoiceItem || "Item"}</h4>
             </div>
             <div className="text-right">
               <p className="text-sm font-medium">{getEligibilityLabel(item.eligibilityStatus || item.policyCompliance)}</p>

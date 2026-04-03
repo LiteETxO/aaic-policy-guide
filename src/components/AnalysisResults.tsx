@@ -845,7 +845,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
       return {
         itemNumber: item.itemNumber,
         invoiceDescription: item.invoiceItem, // Original, NOT translated
-        normalizedName: item.normalizedName,
+        normalizedName: item.normalizedName || item.invoiceItem || "Item",
         systemAssociation,
         systemAssociationAmharic,
         itemClassification,
@@ -1446,7 +1446,7 @@ const AnalysisResults = ({ data }: AnalysisResultsProps) => {
                           </TableCell>
                           <TableCell className="font-mono text-sm">{item.itemNumber}</TableCell>
                           <TableCell className="text-sm max-w-[200px] truncate">{item.invoiceItem}</TableCell>
-                          <TableCell className="font-medium">{item.normalizedName}</TableCell>
+                          <TableCell className="font-medium">{item.normalizedName || item.invoiceItem || "Item"}</TableCell>
                           <TableCell><ConfidenceBadge level={getItemConfidence(item)} size="sm" showLabel={false} /></TableCell>
                           <TableCell><LicenseBadge status={item.licenseAlignment} /></TableCell>
                           <TableCell><EligibilityBadge status={item.eligibilityStatus || item.policyCompliance} /></TableCell>

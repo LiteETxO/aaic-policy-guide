@@ -113,19 +113,19 @@ export const ReportGenerator = ({ analysisData }: ReportGeneratorProps) => {
     // Build conclusion
     const canProceed = complianceItems
       .filter(item => item.eligibilityStatus?.startsWith("Eligible") || item.policyCompliance === "Compliant")
-      .map(item => `${item.itemNumber}. ${item.normalizedName}`);
-    
+      .map(item => `${item.itemNumber}. ${item.normalizedName || item.invoiceItem || "Item"}`);
+
     const requiresClarification = complianceItems
-      .filter(item => 
-        item.eligibilityStatus === "Requires Clarification" || 
+      .filter(item =>
+        item.eligibilityStatus === "Requires Clarification" ||
         item.policyCompliance === "Needs Clarification" ||
         item.policyCompliance === "Conditional"
       )
-      .map(item => `${item.itemNumber}. ${item.normalizedName}`);
-    
+      .map(item => `${item.itemNumber}. ${item.normalizedName || item.invoiceItem || "Item"}`);
+
     const cannotApprove = complianceItems
       .filter(item => item.eligibilityStatus === "Not Eligible" || item.policyCompliance === "Non-Compliant")
-      .map(item => `${item.itemNumber}. ${item.normalizedName}`);
+      .map(item => `${item.itemNumber}. ${item.normalizedName || item.invoiceItem || "Item"}`);
 
     // Build analytical notes from reasoning
     const analyticalNotes = {
@@ -136,18 +136,19 @@ export const ReportGenerator = ({ analysisData }: ReportGeneratorProps) => {
     };
 
     complianceItems.forEach(item => {
+      const itemLabel = item.normalizedName || item.invoiceItem || "Item";
       item.reasoning?.forEach(r => {
         if (r.type === "mapped-match") {
-          analyticalNotes.nameMismatchHandling.push(`${item.normalizedName}: ${r.point}`);
+          analyticalNotes.nameMismatchHandling.push(`${itemLabel}: ${r.point}`);
         }
         if (r.type === "essential-inclusion") {
-          analyticalNotes.essentialityDecisions.push(`${item.normalizedName}: ${r.point}`);
+          analyticalNotes.essentialityDecisions.push(`${itemLabel}: ${r.point}`);
         }
         if (r.type === "assumption-avoided") {
-          analyticalNotes.conservativeAssumptions.push(`${item.normalizedName}: ${r.point}`);
+          analyticalNotes.conservativeAssumptions.push(`${itemLabel}: ${r.point}`);
         }
         if (r.type === "ambiguity") {
-          analyticalNotes.officerDiscretion.push(`${item.normalizedName}: ${r.point}`);
+          analyticalNotes.officerDiscretion.push(`${itemLabel}: ${r.point}`);
         }
       });
     });
