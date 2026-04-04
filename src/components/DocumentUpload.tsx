@@ -506,6 +506,9 @@ Note: This file type cannot be automatically parsed. Please convert to PDF or pa
         if (lastError) {
           error = lastError;
           data = null;
+        } else if (allItems.length === 0) {
+          error = new Error("Analysis returned no results — API may be rate limited or the invoice format was not recognized");
+          data = null;
         } else {
           const eligible = allItems.filter((x: any) => x.decision === "ELIGIBLE").length;
           const excluded = allItems.filter((x: any) => x.decision === "EXCLUDED").length;

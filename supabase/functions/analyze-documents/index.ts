@@ -14,7 +14,7 @@ Output ONLY valid JSON with this exact structure:
 {"complianceItems":[{"itemNumber":1,"invoiceItem":"string","hsCode":"string","decision":"ELIGIBLE","policyBasis":"string"}]}`;
 
 async function analyzeBatch(items: string, apiKey: string): Promise<any[]> {
-  const response = await fetch("https://api.moonshot.ai/v1/chat/completions", {
+  const response = await fetch("https://api.moonshot.cn/v1/chat/completions", {
     method: "POST",
     headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({

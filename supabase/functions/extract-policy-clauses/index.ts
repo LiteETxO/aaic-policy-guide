@@ -51,7 +51,7 @@ async function performExtraction(
       throw new Error("MOONSHOT_API_KEY not configured");
     }
 
-    const aiResponse = await fetch("https://api.moonshot.ai/v1/chat/completions", {
+    const aiResponse = await fetch("https://api.moonshot.cn/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
