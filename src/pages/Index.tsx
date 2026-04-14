@@ -2,14 +2,15 @@ import { useState, useCallback } from "react";
 import Header from "@/components/Header";
 import DocumentUpload from "@/components/DocumentUpload";
 import { AnalysisReport } from "@/components/AnalysisReport";
+import StaticPolicyLibrary from "@/components/StaticPolicyLibrary";
 import { useAnalysisSessions, type AnalysisSession } from "@/hooks/useAnalysisSessions";
 import { useWorkflowStatus } from "@/hooks/useWorkflowStatus";
-import { FileText, Trash2, Loader2, Plus } from "lucide-react";
+import { FileText, Trash2, Loader2, Plus, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const Index = () => {
-  const [view, setView] = useState<"upload" | "report">("upload");
+  const [view, setView] = useState<"upload" | "report" | "policies">("upload");
   const [analysisData, setAnalysisData] = useState<any>(null);
 
   const { reset } = useWorkflowStatus();
@@ -167,6 +168,21 @@ const Index = () => {
               </Button>
             </div>
           )}
+          
+          <div className="p-3 border-t border-slate-100 mt-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "w-full text-xs gap-1.5 justify-start",
+                view === "policies" && "bg-blue-50 text-blue-700"
+              )}
+              onClick={() => setView("policies")}
+            >
+              <BookOpen className="h-3 w-3" />
+              Policy Library
+            </Button>
+          </div>
         </aside>
 
         {/* ── Main content ── */}
@@ -184,8 +200,10 @@ const Index = () => {
               </div>
               <DocumentUpload onAnalyze={handleAnalyze} />
             </div>
-          ) : (
+          ) : view === "report" ? (
             <AnalysisReport analysisData={analysisData} onBack={handleNewAnalysis} />
+          ) : (
+            <StaticPolicyLibrary />
           )}
         </main>
       </div>
